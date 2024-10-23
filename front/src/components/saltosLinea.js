@@ -55,7 +55,7 @@ function SaltosLinea() {
         <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
             <div className="w-75">
                 <h1 className="text-center">Borrar saltos de línea</h1>
-                <p className="text-center">Esta herramienta permite borrar los saltos de línea y espacios innecesarios.</p>
+                <br />
                 <div className="row mb-3">
                     <div className="col">
                         <textarea

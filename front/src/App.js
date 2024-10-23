@@ -6,6 +6,7 @@ import Header from './components/header';
 
 import SaltosLinea from './components/saltosLinea';
 import ModelosML from './components/modelosML';
+import DetalleModelo from './components/detalleModelo';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<Menu />} />
           <Route path="/saltosLinea" element={<SaltosLinea />} />
           <Route path="/modelos" element={<ModelosML />} />
+          <Route path="/modelos/:id" element={<DetalleModelo />} />
         </Routes>
       </div>
     </Router>

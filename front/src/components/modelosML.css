@@ -1,0 +1,49 @@
+/* modelosML.css */
+.modelos-container {
+    margin: 20px auto;
+    width: 80%;
+    max-width: 1200px;
+    text-align: center;
+  }
+  
+  h2 {
+    margin-bottom: 20px;
+    font-family: 'Arial', sans-serif;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .modelos-table {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .modelos-table th, 
+  .modelos-table td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .modelos-table th {
+    background-color: #f4f4f4;
+    font-weight: 600;
+  }
+  
+  .modelos-table tr:hover {
+    background-color: #f1f1f1;
+  }
+  
+  .modelo-link {
+    color: #3498db;
+    text-decoration: none;
+  }
+  
+  .modelo-link:hover {
+    text-decoration: underline;
+  }
+  
