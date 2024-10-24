@@ -161,7 +161,8 @@ function ModelosML() {
             }
 
             const data = await response.json();
-            console.log(data);
+            // Redirigir al detalle del modelo
+            navigate(`/modelos/${data.id}`);
         } catch (error) {
             console.error("Error al crear el modelo:", error);
         }
@@ -183,7 +184,7 @@ function ModelosML() {
                 <h1 className="text-center">Predicciones usando modelos de ML</h1>
                 <br />
                 {modelos.length === 0 && (
-                        <p>No hay modelos disponibles</p>
+                        <p> No has creado ningun modelo</p>
                 )}
                 {modelos.length > 0 && (
                     <table className="modelos-table">
@@ -196,6 +197,7 @@ function ModelosML() {
                                 <th>Tipo</th>
                                 <th>Algoritmos</th>
                                 <th>Entrenado</th>
+                                <th>Fecha creación</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -212,6 +214,7 @@ function ModelosML() {
                                     <td>{modelo.tipo}</td>
                                     <td>{modelo.algoritmos.join(', ')}</td>
                                     <td>{modelo.entrenado ? 'Sí' : 'No'}</td>
+                                    <td>{modelo.fecha_creacion}</td>
                                 </tr>
                             ))}
                         </tbody>
