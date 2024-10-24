@@ -34,6 +34,8 @@ function ModelosML() {
     const [nombre, setNombre] = useState("");
     const [dataset, setDataset] = useState(null);
     const [variable, setVariable] = useState("");
+    const [posiblesParametros, setPosiblesParametros] = useState([]);
+    const [parametros, setParametros] = useState([]);
     const [tipoModelo, setTipoModelo] = useState("");
 
     const [fetchedPossibleVariables, setFetchedPossibleVariables] = useState(0);
@@ -54,6 +56,8 @@ function ModelosML() {
         setFetchedPossibleVariables(0);
         setPossibleVariables([]);
         setPossibleVariableTypes([]);
+        setPosiblesParametros([]);
+        setParametros([]);
         setLoadingVariables(false);
         setSelectedAlgorithms([]);
     }
@@ -70,6 +74,14 @@ function ModelosML() {
         );
     };
 
+    const handleParametroChange = (parametro) => {
+        setParametros((prev) =>
+            prev.includes(parametro)
+                ? prev.filter((a) => a !== parametro)
+                : [...prev, parametro]
+        );
+    };
+
     const onFileChange = async (event) => {
 
         // Reset variables
@@ -78,6 +90,8 @@ function ModelosML() {
         setFetchedPossibleVariables(0);
         setPossibleVariables([]);
         setPossibleVariableTypes([]);
+        setPosiblesParametros([]);
+        setParametros([]);
         setSelectedAlgorithms([]);
         setLoadingVariables(false);
 
@@ -146,6 +160,7 @@ function ModelosML() {
             formData.append("nombre", nombre);
             formData.append("dataset", dataset);
             formData.append("variable", variable);
+            formData.append("parametros", parametros.join(","));
             formData.append("tipo", tipoModelo);
             formData.append("algoritmos", selectedAlgorithms.join(","));
 
@@ -172,6 +187,8 @@ function ModelosML() {
         const selectedVariable = possibleVariables[index];
         setVariable(selectedVariable);
         setTipoModelo(possibleVariableTypes[index] === "numérica" ? "Regresión" : "Clasificación");
+        // posiblesParametros son todas las variables menos la seleccionada
+        setPosiblesParametros(possibleVariables.filter((variable) => variable !== selectedVariable));
     };
     
     const handleRowClick = (id) => {
@@ -180,7 +197,7 @@ function ModelosML() {
 
     return (
         <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
-            <div className="w-75">
+            <div>
                 <h1 className="text-center">Predicciones usando modelos de ML</h1>
                 <br />
                 {modelos.length === 0 && (
@@ -193,6 +210,7 @@ function ModelosML() {
                                 <th>ID</th>
                                 <th>Nombre</th>
                                 <th>Variable</th>
+                                <th>Parametros</th>
                                 <th>Archivo</th>
                                 <th>Tipo</th>
                                 <th>Algoritmos</th>
@@ -210,6 +228,7 @@ function ModelosML() {
                                     <td>{modelo.id}</td>
                                     <td>{modelo.nombre}</td>
                                     <td>{modelo.variable}</td>
+                                    <td>{modelo.parametros.join(', ')}</td>
                                     <td>{modelo.filename}</td>
                                     <td>{modelo.tipo}</td>
                                     <td>{modelo.algoritmos.join(', ')}</td>
@@ -310,8 +329,39 @@ function ModelosML() {
                             <Form.Group as={Row} className="mb-3">
                                 <Col sm="3">
                                     <Row>
+                                    <Form.Label column sm="3">Parametros</Form.Label>
+                                    </Row>
+                                    <Button variant = "primary" size="sm" onClick={() => setParametros(posiblesParametros)}>Seleccionar todos</Button>
+                                    <div className="mb-3"></div>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setParametros([])}
+                                        {...(parametros.length === 0 && { disabled: true })}
+                                    > Limpiar selección </Button>
+                                </Col>
+                                <Col sm="9">
+                                    {posiblesParametros?.map((parametro, index) => (
+                                        <Form.Check
+                                            key={index}
+                                            type="checkbox"
+                                            label={parametro}
+                                            checked={parametros.includes(parametro)}
+                                            onChange={() => handleParametroChange(parametro)}
+                                        />
+                                    ))}
+                                </Col>
+                            </Form.Group>
+                        )}
+
+                        {parametros.length > 0 && (
+                            <Form.Group as={Row} className="mb-3">
+                                <Col sm="3">
+                                    <Row>
                                     <Form.Label column sm="3">Algoritmos</Form.Label>
                                     </Row>
+                                    <Button variant = "primary" size="sm" onClick={() => setSelectedAlgorithms(algorithmOptions[tipoModelo])}>Seleccionar todos</Button>
+                                    <div className="mb-3"></div>
                                     <Button
                                         variant="secondary"
                                         size="sm"
@@ -340,7 +390,7 @@ function ModelosML() {
                         Cerrar
                     </Button>
                     <Button variant="primary" type="submit" onClick={handleSubmit}
-                    {...((!nombre || !dataset || !variable || !tipoModelo || selectedAlgorithms.length === 0) && { disabled: true })}
+                    {...((!nombre || !dataset || !variable || !tipoModelo || parametros.length===0 || selectedAlgorithms.length === 0) && { disabled: true })}
                     >
                         Crear Modelo
                     </Button>

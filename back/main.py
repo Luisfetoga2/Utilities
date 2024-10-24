@@ -45,6 +45,7 @@ class Modelo(BaseModel):
     variable: str
     filename: str 
     tipo: str  # Regresión o Clasificación
+    parametros: List[str] # Parámetros del modelo (columnas)
     algoritmos: List[str]
     entrenado: bool = False 
     fecha_creacion: str = None
@@ -62,8 +63,8 @@ if not os.path.exists('models/models.txt'):
 with open('models/models.txt', 'r') as file:
     line = file.readline()
     while line:
-        id, nombre, variable, filename, tipo, algoritmos, entrenado, fecha_creacion, mejor_modelo, score = line.strip().split(';')
-        modelos.append(Modelo(id=int(id), nombre=nombre, variable=variable, filename=filename, tipo=tipo, algoritmos=algoritmos.split(','), entrenado=entrenado=='True', fecha_creacion=fecha_creacion, mejor_modelo=mejor_modelo, score=float(score) if score else None))
+        id, nombre, variable, filename, tipo, parametros, algoritmos, entrenado, fecha_creacion, mejor_modelo, score = line.strip().split(';')
+        modelos.append(Modelo(id=int(id), nombre=nombre, variable=variable, filename=filename, tipo=tipo, parametros=parametros.split(','), algoritmos=algoritmos.split(','), entrenado=entrenado=='True', fecha_creacion=fecha_creacion, mejor_modelo=mejor_modelo, score=float(score) if score else None))
         line = file.readline()
 
 opcionesAlgoritmos = {
@@ -132,6 +133,13 @@ funcionesAlgoritmos = {
     #'Gaussian Mixture Models (GMM)': sklearn.mixture.GaussianMixture()
 }
 
+def actualizar_modelos():
+    with open('models/models.txt', 'w') as file:
+        for m in modelos:
+            file.write(f"{m.id};{m.nombre};{m.variable};{m.filename};"
+                       f"{m.tipo};{','.join(m.parametros)};{','.join(m.algoritmos)};"
+                       f"{m.entrenado};{m.fecha_creacion};{m.mejor_modelo};{m.score}\n")
+
 
 @app.get("/modelos", response_model=List[Modelo])
 def obtener_modelos():
@@ -143,6 +151,7 @@ async def crear_modelo(
     dataset: UploadFile = File(...),
     variable: str = Form(...),
     tipo: str = Form(...),
+    parametros: str = Form(...),
     algoritmos: str = Form(...),
 ):    
     try:
@@ -167,6 +176,7 @@ async def crear_modelo(
         variable=variable, 
         filename=dataset.filename, 
         tipo=tipo,
+        parametros=parametros.split(','),
         algoritmos=algoritmos.split(','),
         entrenado=False,
         fecha_creacion=time.strftime('%d-%m-%Y')
@@ -175,7 +185,7 @@ async def crear_modelo(
 
     # Write on models/models.txt
     with open('models/models.txt', 'a') as file:
-        file.write(f'{nuevo_modelo.id};{nuevo_modelo.nombre};{nuevo_modelo.variable};{nuevo_modelo.filename};{nuevo_modelo.tipo};{",".join(nuevo_modelo.algoritmos)};{nuevo_modelo.entrenado};{nuevo_modelo.fecha_creacion};;\n')
+        file.write(f'{nuevo_modelo.id};{nuevo_modelo.nombre};{nuevo_modelo.variable};{nuevo_modelo.filename};{nuevo_modelo.tipo};{",".join(nuevo_modelo.parametros)};{",".join(nuevo_modelo.algoritmos)};{nuevo_modelo.entrenado};{nuevo_modelo.fecha_creacion};;\n')
 
     return nuevo_modelo
 
@@ -214,7 +224,7 @@ def obtener_algoritmos():
 
 # Entrenar un modelo
 @app.post("/modelos/{id}/entrenar")
-def entrenar_modelo(id: int):
+async def entrenar_modelo(id: int):
     modelo = next((m for m in modelos if m.id == id), None)
     if modelo is None:
         raise HTTPException(status_code=404, detail="Modelo no encontrado")
@@ -239,7 +249,7 @@ def entrenar_modelo(id: int):
     dataset = dataset.dropna(subset=[modelo.variable])
 
     # Separar características y variable objetivo
-    X = dataset.drop(columns=modelo.variable)
+    X = dataset.drop(columns=modelo.variable)[modelo.parametros]
     y = dataset[modelo.variable]
 
     # Identificar columnas categóricas y numéricas
@@ -249,6 +259,9 @@ def entrenar_modelo(id: int):
     # Guardar las columnas para predicciones futuras
     joblib.dump(list(numerical_columns), f'models/model{id}/numerical_columns.joblib')
     joblib.dump(list(categorical_columns), f'models/model{id}/categorical_columns.joblib')
+
+    # Guardar los posibles valores de las columnas categóricas
+    joblib.dump({col: X[col].unique().tolist() for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
     # Imputar valores faltantes
     X[numerical_columns] = X[numerical_columns].fillna(X[numerical_columns].median())
@@ -313,16 +326,12 @@ def entrenar_modelo(id: int):
     modelo.score = best_score
 
     # Actualizar y guardar el archivo de modelos
-    with open('models/models.txt', 'w') as file:
-        for m in modelos:
-            file.write(f"{m.id};{m.nombre};{m.variable};{m.filename};"
-                       f"{m.tipo};{','.join(m.algoritmos)};"
-                       f"{m.entrenado};{m.fecha_creacion};{m.mejor_modelo};{m.score}\n")
+    actualizar_modelos()
 
     return {"message": "Modelo entrenado exitosamente", "mejor_modelo": modelo.nombre}
 
 @app.post("/modelos/{id}/predecir")
-def predecir(id: int, datos: dict):
+async def predecir(id: int, datos: dict):
     modelo = next((m for m in modelos if m.id == id), None)
     if modelo is None or not modelo.entrenado:
         raise HTTPException(status_code=404, detail="Modelo no encontrado o no entrenado")
@@ -376,4 +385,39 @@ def obtener_parametros(id: int):
 
     return numerical_columns+categorical_columns
     
-   
+@app.get("/modelos/{id}/parametrosLabels")
+async def obtener_parametros_valores(id: int):
+    modelo = next((m for m in modelos if m.id == id), None)
+    if modelo is None or not modelo.entrenado:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado o no entrenado")
+    
+    parametrosModelo = obtener_parametros(id)
+
+    categorical_values = joblib.load(f'models/model{id}/categorical_values.joblib')
+
+    valores = {}
+    for parametro in parametrosModelo:
+        if parametro in categorical_values:
+            valores[parametro] = categorical_values[parametro]
+
+    return valores
+
+@app.delete("/modelos/{id}")
+async def eliminar_modelo(id: int):
+    global modelos
+    modelo = next((m for m in modelos if m.id == id), None)
+    if modelo is None:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado")
+    
+    modelos = [m for m in modelos if m.id != id]
+
+    # Eliminar el directorio del modelo
+    folder_path = f'models/model{id}'
+    if os.path.exists(folder_path):
+        import shutil
+        shutil.rmtree(folder_path)
+
+    # Actualizar y guardar el archivo de modelos
+    actualizar_modelos()
+
+    return {"message": "Modelo eliminado exitosamente"}

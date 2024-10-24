@@ -1,4 +1,4 @@
-import React, { useEffect, useState  } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { Container, Button, Form, Table, Col, Row, Card, ProgressBar, Spinner, Badge } from 'react-bootstrap';
 import { FaStar, FaChartLine, FaPlay } from 'react-icons/fa';
@@ -11,6 +11,7 @@ function DetalleModelo() {
   const [resultado, setResultado] = useState("-");
   const [parametros, setParametros] = useState([]);
   const [inputValues, setInputValues] = useState({}); // Store input values for prediction
+  const [inputLabels, setInputLabels] = useState({}); // Store input labels for prediction
 
   useEffect(() => {
     async function fetchModelo() {
@@ -32,6 +33,13 @@ function DetalleModelo() {
           const paramsData = await response.json();
           setParametros(paramsData);
           initializeInputValues(paramsData);
+
+          const labelsResponse = await fetch(`http://127.0.0.1:8000/modelos/${id}/parametrosLabels`);
+          if (!labelsResponse.ok) {
+            throw new Error(`HTTP error! status: ${labelsResponse.status}`);
+          }
+          const labelsData = await labelsResponse.json();
+          setInputLabels(labelsData);
         }
       } catch (error) {
         console.error("Network error:", error);
@@ -50,6 +58,33 @@ function DetalleModelo() {
     setInputValues(initialValues);
   };
 
+  const handlePredecir = useCallback(async () => {
+    try {
+      const jsonBody = {};
+      parametros.forEach((param) => {
+        jsonBody[param] = inputValues[param];
+      });
+
+      const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/predecir`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(jsonBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResultado(data.prediccion);
+    } catch (error) {
+      console.error("Prediction error:", error);
+      setResultado("Error en la predicción");
+    }
+  }, [id, parametros, inputValues]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
   
@@ -60,12 +95,20 @@ function DetalleModelo() {
 
     console.log(inputValues);
   };
+
+  const handleSelectChange = (e) => {
+    const { name, value } = e.target;
+  
+    setInputValues((prevValues) => ({
+      ...prevValues,
+      [name]: value,
+    }));
+  };
   
   // Use useEffect to react to changes in inputValues
-  function checkAllFilled() {
-    console.log(parametros.every((param) => inputValues[param] !== ""));
+  const checkAllFilled = useCallback(() => {
     return parametros.every((param) => inputValues[param] !== "");
-  }
+  }, [parametros, inputValues]);
   
   useEffect(() => {
     if (parametros.length > 0 && checkAllFilled()) {
@@ -73,12 +116,21 @@ function DetalleModelo() {
     } else {
       setResultado("-");
     }
-  }, [inputValues]);
+  }, [inputValues, parametros.length, checkAllFilled, handlePredecir]);
   
 
   const handleEliminar = () => {
     console.log("Eliminar modelo", id);
-    // TODO
+    fetch(`http://127.0.0.1:8000/modelos/${id}`, {
+      method: "DELETE",
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Modelo eliminado:", data);
+        // Redirect to /modelos
+        window.location.href = "/modelos";
+      }
+    );
   };
 
   const handleEntrenar = () => {
@@ -95,32 +147,6 @@ function DetalleModelo() {
       );
   };
 
-  const handlePredecir = async () => {
-    try {
-      const jsonBody = {}
-      parametros.forEach(param => {
-        jsonBody[param] = inputValues[param];
-      });
-      const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/predecir`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(jsonBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log("Prediction result:", data.prediccion);
-      setResultado(data.prediccion);
-    } catch (error) {
-      console.error("Prediction error:", error);
-      setResultado("Error en la predicción");
-    }
-  };
-
   return (
     <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
       <div className="w-80">
@@ -135,6 +161,7 @@ function DetalleModelo() {
                 <tr>
                   <th>ID</th>
                   <th>Variable</th>
+                  <th>Parametros</th>
                   <th>Archivo</th>
                   <th>Tipo</th>
                   <th>Algoritmos</th>
@@ -146,6 +173,7 @@ function DetalleModelo() {
                 <tr>
                   <td>{modelo.id}</td>
                   <td>{modelo.variable}</td>
+                  <td>{modelo.parametros.join(", ")}</td>
                   <td>{modelo.filename}</td>
                   <td>{modelo.tipo}</td>
                   <td>{modelo.algoritmos.join(", ")}</td>
@@ -194,7 +222,6 @@ function DetalleModelo() {
                 <Row>
                 <h2>Predecir</h2>
                 <Col>
-                  
                   <Form>
                     <Table bordered>
                       <thead>
@@ -208,12 +235,25 @@ function DetalleModelo() {
                           <tr key={param}>
                             <td>{param}</td>
                             <td>
-                              <Form.Control
-                                type="text"
-                                name={param}
-                                value={inputValues[param] || ""}
-                                onChange={handleInputChange}
-                              />
+                              {inputLabels[param] ? (
+                                <Form.Select
+                                  name={param}
+                                  value={inputValues[param] || ""}
+                                  onChange={handleSelectChange}
+                                >
+                                  <option value="">Seleccionar...</option>
+                                  {inputLabels[param].map((label) => (
+                                    <option key={label} value={label}>{label}</option>
+                                  ))}
+                                </Form.Select>
+                              ) : (
+                                <Form.Control
+                                  type="number"
+                                  name={param}
+                                  value={inputValues[param] || ""}
+                                  onChange={handleInputChange}
+                                />
+                              )}
                             </td>
                           </tr>
                         ))}
