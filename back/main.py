@@ -62,8 +62,8 @@ if not os.path.exists('models/models.txt'):
 with open('models/models.txt', 'r') as file:
     line = file.readline()
     while line:
-        id, nombre, variable, filename, tipo, algoritmos, entrenado, fecha_creacion = line.strip().split(';')
-        modelos.append(Modelo(id=int(id), nombre=nombre, variable=variable, filename=filename, tipo=tipo, algoritmos=algoritmos.split(','), entrenado=entrenado=='True', fecha_creacion=fecha_creacion))
+        id, nombre, variable, filename, tipo, algoritmos, entrenado, fecha_creacion, mejor_modelo, score = line.strip().split(';')
+        modelos.append(Modelo(id=int(id), nombre=nombre, variable=variable, filename=filename, tipo=tipo, algoritmos=algoritmos.split(','), entrenado=entrenado=='True', fecha_creacion=fecha_creacion, mejor_modelo=mejor_modelo, score=float(score) if score else None))
         line = file.readline()
 
 opcionesAlgoritmos = {
@@ -90,16 +90,16 @@ opcionesAlgoritmos = {
         'Perceptrón', 
         'Red Neuronal (MLPClassifier)'
     ],
-    'Agrupación': [
-        'K-Means', 
-        'DBSCAN', 
-        'Mean Shift', 
-        'Agglomerative Clustering', 
-        'Birch', 
-        'Affinity Propagation', 
-        'Spectral Clustering', 
-        'Gaussian Mixture Models (GMM)'
-    ]
+    #'Agrupación': [
+    #    'K-Means', 
+    #    'DBSCAN', 
+    #    'Mean Shift', 
+    #    'Agglomerative Clustering', 
+    #    'Birch', 
+    #    'Affinity Propagation', 
+    #    'Spectral Clustering', 
+    #    'Gaussian Mixture Models (GMM)'
+    #]
 }
 
 funcionesAlgoritmos = {
@@ -122,14 +122,14 @@ funcionesAlgoritmos = {
     'K-Neighbors Classifier': sklearn.neighbors.KNeighborsClassifier(),
     'Perceptrón': sklearn.linear_model.Perceptron(),
     'Red Neuronal (MLPClassifier)': sklearn.neural_network.MLPClassifier(),
-    'K-Means': sklearn.cluster.KMeans(),
-    'DBSCAN': sklearn.cluster.DBSCAN(),
-    'Mean Shift': sklearn.cluster.MeanShift(),
-    'Agglomerative Clustering': sklearn.cluster.AgglomerativeClustering(),
-    'Birch': sklearn.cluster.Birch(),
-    'Affinity Propagation': sklearn.cluster.AffinityPropagation(),
-    'Spectral Clustering': sklearn.cluster.SpectralClustering(),
-    'Gaussian Mixture Models (GMM)': sklearn.mixture.GaussianMixture()
+    #'K-Means': sklearn.cluster.KMeans(),
+    #'DBSCAN': sklearn.cluster.DBSCAN(),
+    #'Mean Shift': sklearn.cluster.MeanShift(),
+    #'Agglomerative Clustering': sklearn.cluster.AgglomerativeClustering(),
+    #'Birch': sklearn.cluster.Birch(),
+    #'Affinity Propagation': sklearn.cluster.AffinityPropagation(),
+    #'Spectral Clustering': sklearn.cluster.SpectralClustering(),
+    #'Gaussian Mixture Models (GMM)': sklearn.mixture.GaussianMixture()
 }
 
 
@@ -175,7 +175,7 @@ async def crear_modelo(
 
     # Write on models/models.txt
     with open('models/models.txt', 'a') as file:
-        file.write(f'{nuevo_modelo.id};{nuevo_modelo.nombre};{nuevo_modelo.variable};{nuevo_modelo.filename};{nuevo_modelo.tipo};{",".join(nuevo_modelo.algoritmos)};{nuevo_modelo.entrenado};{nuevo_modelo.fecha_creacion}\n')
+        file.write(f'{nuevo_modelo.id};{nuevo_modelo.nombre};{nuevo_modelo.variable};{nuevo_modelo.filename};{nuevo_modelo.tipo};{",".join(nuevo_modelo.algoritmos)};{nuevo_modelo.entrenado};{nuevo_modelo.fecha_creacion};;\n')
 
     return nuevo_modelo
 
@@ -260,7 +260,7 @@ def entrenar_modelo(id: int):
     )
 
     # Aplicar OneHotEncoder a las columnas categóricas
-    encoder = sklearn.preprocessing.OneHotEncoder(drop='first', sparse=False, handle_unknown='ignore')
+    encoder = sklearn.preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
     encoded_data = encoder.fit_transform(X[categorical_columns])
     encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out(categorical_columns))
 

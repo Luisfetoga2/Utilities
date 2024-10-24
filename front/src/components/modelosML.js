@@ -171,7 +171,7 @@ function ModelosML() {
     const handleVariableChange = (index) => {
         const selectedVariable = possibleVariables[index];
         setVariable(selectedVariable);
-        setTipoModelo(possibleVariableTypes[index] === "numérica" ? "Regresión" : "");
+        setTipoModelo(possibleVariableTypes[index] === "numérica" ? "Regresión" : "Clasificación");
     };
     
     const handleRowClick = (id) => {
@@ -291,12 +291,17 @@ function ModelosML() {
                                         readOnly
                                         disabled
                                     />) : (
-                                        <Form.Select value = {tipoModelo} onChange={e => setTipoModelo(e.target.value)} >
-                                            <option value="">Seleccione un tipo de modelo</option>
-                                            <option value="Agrupación">Agrupación</option>
-                                            <option value="Clasificación">Clasificación</option>
-                                        </Form.Select> 
-                                        )}
+                                        <Form.Control
+                                            type="text"
+                                            value={tipoModelo}
+                                            readOnly
+                                            disabled
+                                        />
+                                        )} {/* <Form.Select value = {tipoModelo} onChange={e => setTipoModelo(e.target.value)} >
+                                        <option value="">Seleccione un tipo de modelo</option>
+                                        <option value="Agrupación">Agrupación</option>
+                                        <option value="Clasificación">Clasificación</option>
+                                    </Form.Select> */}
                                 </Col>
                             </Form.Group>
                         )}
