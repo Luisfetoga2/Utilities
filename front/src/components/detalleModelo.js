@@ -12,6 +12,8 @@ function DetalleModelo() {
   const [parametros, setParametros] = useState([]);
   const [inputValues, setInputValues] = useState({}); // Store input values for prediction
   const [inputLabels, setInputLabels] = useState({}); // Store input labels for prediction
+  const [scores, setScores] = useState(null);
+  const [metrics, setMetrics] = useState(null);
 
   useEffect(() => {
     async function fetchModelo() {
@@ -22,9 +24,11 @@ function DetalleModelo() {
         }
         const data = await response.json();
         console.log("Modelo encontrado");
+        console.log(data)
         setModelo(data);
         setModelFound(1);
         if (data.entrenado) {
+          console.log("Modelo entrenado");
           setEstadoEntrenamiento(2);
           const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/parametros`);
           if (!response.ok) {
@@ -49,6 +53,48 @@ function DetalleModelo() {
 
     fetchModelo();
   }, [id]);
+
+  const fetchScores = useCallback(async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/scores`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      // Sort scores by dictionary value
+      const dict = data;
+      const sorted = Object.keys(dict).sort((a, b) => dict[b] - dict[a]).reduce((obj, key) => {
+        obj[key] = dict[key];
+        return obj;
+      }, {});
+
+      console.log("Scores:", sorted);
+      setScores(sorted); // Store the scores in state
+    } catch (error) {
+      console.error("Error fetching scores:", error);
+    }
+  }, [id]);
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/metrics`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setMetrics(data); // Store metrics in state
+    } catch (error) {
+      console.error("Error fetching metrics:", error);
+    }
+  }, [id]);
+  
+  useEffect(() => {
+    if (estadoEntrenamiento === 2) {
+      console.log("Estado de entrenamiento:", estadoEntrenamiento);
+      fetchScores();
+      fetchMetrics();
+    }
+  }, [estadoEntrenamiento]);
+  
 
   const initializeInputValues = (params) => {
     const initialValues = {};
@@ -186,35 +232,68 @@ function DetalleModelo() {
             <Button variant="danger" onClick={handleEliminar}>Eliminar modelo</Button>
 
             <Container style={{ paddingTop: '20px' }}>
-                  <h2>Entrenamiento</h2>
-                  {estadoEntrenamiento === 0 && (
-                    <Button variant="success" onClick={handleEntrenar} className="mt-3">
-                      <FaPlay style={{ marginRight: '8px' }} />
-                      Iniciar Entrenamiento
-                    </Button>
-                  )}
-                  {estadoEntrenamiento === 1 && (
+              <h2>Entrenamiento</h2>
+              {estadoEntrenamiento === 0 && (
+                <Button variant="success" onClick={handleEntrenar} className="mt-3">
+                  <FaPlay style={{ marginRight: '8px' }} />
+                  Iniciar Entrenamiento
+                </Button>
+              )}
+              {estadoEntrenamiento === 1 && (
+                <>
+                  <Spinner animation="border" variant="primary" />
+                  <h4 className="mt-3">Entrenando modelo...</h4>
+                  <ProgressBar animated now={75} label="75%" className="mt-3" />
+                </>
+              )}
+              {estadoEntrenamiento === 2 && (
+              <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '400px', margin: 'auto' }}>
+                <Card.Body className="text-center">
+                <h5 className="mt-4">Scores por Modelo:</h5>
+                <Table bordered style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f2f2f2', textAlign: 'left' }}>
+                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Modelo</th>
+                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>R² Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scores && Object.entries(scores).map(([modelName, score]) => (
+                      <tr key={modelName} style={{ borderBottom: '1px solid #ddd' }}>
+                        <td style={{ padding: '10px' }}>{modelName}</td>
+                        <td style={{ padding: '10px' }}>{score.toFixed(3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+                  <h3>
+                    <FaStar style={{ color: '#FFD700', marginRight: '8px' }} />
+                    Mejor Modelo: 
+                    <Badge bg="info" className="ms-2">{modelo.mejor_modelo}</Badge>
+                  </h3>
+                  <h4 className="mt-3">
+                    <FaChartLine style={{ marginRight: '8px' }} />
+                    Score: <span style={{ fontWeight: 'bold', color: '#007bff' }}>{modelo.score.toFixed(3)}</span>
+                  </h4>
+
+                  {metrics && (
                     <>
-                      <Spinner animation="border" variant="primary" />
-                      <h4 className="mt-3">Entrenando modelo...</h4>
-                      <ProgressBar animated now={75} label="75%" className="mt-3" />
+                      <h5 className="mt-4">Métricas del Mejor Modelo:</h5>
+                      <Table bordered>
+                        <tbody>
+                          {Object.entries(metrics).map(([key, value]) => (
+                            <tr key={key}>
+                              <td>{key}</td>
+                              <td>{typeof value === 'number' ? value.toFixed(3) : JSON.stringify(value)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
                     </>
                   )}
-                  {estadoEntrenamiento === 2 && (
-                    <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '400px', margin: 'auto' }}>
-                      <Card.Body className="text-center">
-                        <h3>
-                          <FaStar style={{ color: '#FFD700', marginRight: '8px' }} />
-                          Mejor Modelo: 
-                          <Badge bg="info" className="ms-2">{modelo.mejor_modelo}</Badge>
-                        </h3>
-                        <h4 className="mt-3">
-                          <FaChartLine style={{ marginRight: '8px' }} />
-                          R²: <span style={{ fontWeight: 'bold', color: '#007bff' }}>{modelo.score.toFixed(3)}</span>
-                        </h4>
-                      </Card.Body>
-                    </Card>
-                  )}
+                </Card.Body>
+              </Card>
+            )}
             </Container>
 
             {estadoEntrenamiento === 2 && (

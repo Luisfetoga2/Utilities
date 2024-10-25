@@ -188,6 +188,7 @@ function ModelosML() {
         setVariable(selectedVariable);
         setTipoModelo(possibleVariableTypes[index] === "numérica" ? "Regresión" : "Clasificación");
         // posiblesParametros son todas las variables menos la seleccionada
+        setParametros([]);
         setPosiblesParametros(possibleVariables.filter((variable) => variable !== selectedVariable));
     };
     

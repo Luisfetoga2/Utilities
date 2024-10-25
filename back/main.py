@@ -17,6 +17,10 @@ from sklearn import cluster
 from sklearn import mixture
 from sklearn import naive_bayes
 from sklearn import model_selection
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score, 
+    mean_absolute_error, mean_squared_error, r2_score, confusion_matrix
+)
 import numpy as np
 import joblib
 from unidecode import unidecode
@@ -104,32 +108,32 @@ opcionesAlgoritmos = {
 }
 
 funcionesAlgoritmos = {
-    'Regresión Lineal': sklearn.linear_model.LinearRegression(),
-    'Regresión Ridge': sklearn.linear_model.Ridge(),
-    'Regresión Lasso': sklearn.linear_model.Lasso(),
-    'ElasticNet': sklearn.linear_model.ElasticNet(),
-    'Bayesian Ridge': sklearn.linear_model.BayesianRidge(),
-    'SVR (Máquina de Soporte Vectorial)': sklearn.svm.SVR(),
-    'Árbol de Decisión para Regresión': sklearn.tree.DecisionTreeRegressor(),
-    'Random Forest Regressor': sklearn.ensemble.RandomForestRegressor(),
-    'Gradient Boosting Regressor': sklearn.ensemble.GradientBoostingRegressor(),
-    'K-Neighbors Regressor': sklearn.neighbors.KNeighborsRegressor(),
-    'Regresión Logística': sklearn.linear_model.LogisticRegression(),
-    'Máquina de Soporte Vectorial (SVC)': sklearn.svm.SVC(),
-    'Árbol de Decisión': sklearn.tree.DecisionTreeClassifier(),
-    'Random Forest Classifier': sklearn.ensemble.RandomForestClassifier(),
-    'Gradient Boosting Classifier': sklearn.ensemble.GradientBoostingClassifier(),
-    'Naive Bayes': sklearn.naive_bayes.GaussianNB(),
-    'K-Neighbors Classifier': sklearn.neighbors.KNeighborsClassifier(),
-    'Perceptrón': sklearn.linear_model.Perceptron(),
-    'Red Neuronal (MLPClassifier)': sklearn.neural_network.MLPClassifier(),
-    #'K-Means': sklearn.cluster.KMeans(),
-    #'DBSCAN': sklearn.cluster.DBSCAN(),
-    #'Mean Shift': sklearn.cluster.MeanShift(),
-    #'Agglomerative Clustering': sklearn.cluster.AgglomerativeClustering(),
-    #'Birch': sklearn.cluster.Birch(),
-    #'Affinity Propagation': sklearn.cluster.AffinityPropagation(),
-    #'Spectral Clustering': sklearn.cluster.SpectralClustering(),
+    'Regresión Lineal': sklearn.linear_model.LinearRegression,
+    'Regresión Ridge': sklearn.linear_model.Ridge,
+    'Regresión Lasso': sklearn.linear_model.Lasso,
+    'ElasticNet': sklearn.linear_model.ElasticNet,
+    'Bayesian Ridge': sklearn.linear_model.BayesianRidge,
+    'SVR (Máquina de Soporte Vectorial)': sklearn.svm.SVR,
+    'Árbol de Decisión para Regresión': sklearn.tree.DecisionTreeRegressor,
+    'Random Forest Regressor': sklearn.ensemble.RandomForestRegressor,
+    'Gradient Boosting Regressor': sklearn.ensemble.GradientBoostingRegressor,
+    'K-Neighbors Regressor': sklearn.neighbors.KNeighborsRegressor,
+    'Regresión Logística': sklearn.linear_model.LogisticRegression,
+    'Máquina de Soporte Vectorial (SVC)': sklearn.svm.SVC,
+    'Árbol de Decisión': sklearn.tree.DecisionTreeClassifier,
+    'Random Forest Classifier': sklearn.ensemble.RandomForestClassifier,
+    'Gradient Boosting Classifier': sklearn.ensemble.GradientBoostingClassifier,
+    'Naive Bayes': sklearn.naive_bayes.GaussianNB,
+    'K-Neighbors Classifier': sklearn.neighbors.KNeighborsClassifier,
+    'Perceptrón': sklearn.linear_model.Perceptron,
+    'Red Neuronal (MLPClassifier)': sklearn.neural_network.MLPClassifier,
+    #'K-Means': sklearn.cluster.KMeans,
+    #'DBSCAN': sklearn.cluster.DBSCAN,
+    #'Mean Shift': sklearn.cluster.MeanShift,
+    #'Agglomerative Clustering': sklearn.cluster.AgglomerativeClustering,
+    #'Birch': sklearn.cluster.Birch,
+    #'Affinity Propagation': sklearn.cluster.AffinityPropagation,
+    #'Spectral Clustering': sklearn.cluster.SpectralClustering,
     #'Gaussian Mixture Models (GMM)': sklearn.mixture.GaussianMixture()
 }
 
@@ -231,10 +235,10 @@ async def entrenar_modelo(id: int):
     if modelo.entrenado:
         raise HTTPException(status_code=400, detail="El modelo ya ha sido entrenado")
 
-    # Cargar el dataset
+    # Load the dataset
     file_extension = os.path.splitext(modelo.filename)[1]
     dataset_path = f'models/model{id}/dataset{file_extension}'
-    
+
     try:
         if file_extension == '.csv':
             dataset = pd.read_csv(dataset_path)
@@ -245,14 +249,10 @@ async def entrenar_modelo(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al leer el archivo: {str(e)}")
 
-    # Eliminar filas con valores faltantes en la variable objetivo
     dataset = dataset.dropna(subset=[modelo.variable])
-
-    # Separar características y variable objetivo
     X = dataset.drop(columns=modelo.variable)[modelo.parametros]
     y = dataset[modelo.variable]
 
-    # Identificar columnas categóricas y numéricas
     categorical_columns = X.select_dtypes(include=['object']).columns
     numerical_columns = X.select_dtypes(include=[np.number]).columns
 
@@ -264,16 +264,11 @@ async def entrenar_modelo(id: int):
     joblib.dump({col: X[col].unique().tolist() for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
     # Imputar valores faltantes
+    X[categorical_columns] = X[categorical_columns].applymap(lambda x: unidecode(str(x).lower()) if isinstance(x, str) else x)
     X[numerical_columns] = X[numerical_columns].fillna(X[numerical_columns].median())
     X[categorical_columns] = X[categorical_columns].fillna("Desconocido")
 
-    # Preprocesar variables categóricas
-    X[categorical_columns] = X[categorical_columns].applymap(
-        lambda x: unidecode(str(x).lower()) if isinstance(x, str) else x
-    )
-
-    # Aplicar OneHotEncoder a las columnas categóricas
-    encoder = sklearn.preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
+    encoder = preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
     encoded_data = encoder.fit_transform(X[categorical_columns])
     encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out(categorical_columns))
 
@@ -283,9 +278,7 @@ async def entrenar_modelo(id: int):
 
     # Concatenar datos numéricos y codificados
     X = pd.concat([X[numerical_columns].reset_index(drop=True), encoded_df], axis=1)
-
-    # Escalar las columnas numéricas
-    scaler = sklearn.preprocessing.StandardScaler()
+    scaler = preprocessing.StandardScaler()
     X[numerical_columns] = scaler.fit_transform(X[numerical_columns])
 
     # Guardar el escalador y las columnas finales
@@ -293,42 +286,70 @@ async def entrenar_modelo(id: int):
     joblib.dump(list(X.columns), f'models/model{id}/feature_columns.joblib')
 
     # Dividir los datos en entrenamiento y prueba
-    X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
 
-    # Entrenar el mejor modelo
     best_score = 0
     best_model = None
     mejor_modelo = None
+    scores = {}
+    all_metrics = {}
+
     for algoritmo in modelo.algoritmos:
-        model = funcionesAlgoritmos[algoritmo]
-        
-        # Entrenar el modelo
+        model = funcionesAlgoritmos[algoritmo]()
         model.fit(X_train, y_train)
-        
-        # Evaluar el modelo
-        score = model.score(X_test, y_test)
+        y_pred = model.predict(X_test)
+
+        if modelo.tipo == 'Regresión':
+            r2 = r2_score(y_test, y_pred)
+            mae = mean_absolute_error(y_test, y_pred)
+            mse = mean_squared_error(y_test, y_pred)
+            rmse = np.sqrt(mse)
+
+            metrics = {
+                'r2_score': r2,
+                'mae': mae,
+                'mse': mse,
+                'rmse': rmse
+            }
+            score = r2
+
+        elif modelo.tipo == 'Clasificación':
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+            recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
+            f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+
+            metrics = {
+                'accuracy': accuracy,
+                'precision': precision,
+                'recall': recall,
+                'f1_score': f1,
+                'confusion_matrix': confusion_matrix(y_test, y_pred).tolist()
+            }
+            score = accuracy
+
         if score > best_score:
             best_score = score
             best_model = model
             mejor_modelo = algoritmo
 
+        scores[algoritmo] = score
+        all_metrics[algoritmo] = metrics
+
     if best_model is None:
         raise HTTPException(status_code=500, detail="No se pudo entrenar ningún modelo")
 
-    # Guardar el modelo entrenado
+    # Save the trained model and metrics
     joblib.dump(best_model, f'models/model{id}/trained_model.joblib')
+    joblib.dump(scores, f'models/model{id}/scores.joblib')
+    joblib.dump(all_metrics, f'models/model{id}/metrics.joblib')
 
-    # Marcar el modelo como entrenado
     modelo.entrenado = True
     modelo.mejor_modelo = mejor_modelo
     modelo.score = best_score
-
-    # Actualizar y guardar el archivo de modelos
     actualizar_modelos()
 
-    return {"message": "Modelo entrenado exitosamente", "mejor_modelo": modelo.nombre}
+    return {"message": "Modelo entrenado exitosamente", "mejor_modelo": mejor_modelo, "score": best_score}
 
 @app.post("/modelos/{id}/predecir")
 async def predecir(id: int, datos: dict):
@@ -421,3 +442,24 @@ async def eliminar_modelo(id: int):
     actualizar_modelos()
 
     return {"message": "Modelo eliminado exitosamente"}
+
+@app.get("/modelos/{id}/scores")
+def obtener_scores(id: int):
+    modelo = next((m for m in modelos if m.id == id), None)
+    if modelo is None or not modelo.entrenado:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado o no entrenado")
+
+    scores = joblib.load(f'models/model{id}/scores.joblib')
+
+    return scores
+
+@app.get("/modelos/{id}/metrics")
+def obtener_metricas(id: int):
+    modelo = next((m for m in modelos if m.id == id), None)
+    if modelo is None or not modelo.entrenado:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado o no entrenado")
+
+    # Load the metrics from the joblib file
+    metrics = joblib.load(f'models/model{id}/metrics.joblib')
+
+    return metrics[modelo.mejor_modelo]
