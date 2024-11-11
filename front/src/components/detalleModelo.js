@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { Container, Button, Form, Table, Col, Row, Card, ProgressBar, Spinner, Badge } from 'react-bootstrap';
-import { FaStar, FaChartLine, FaPlay } from 'react-icons/fa';
+import { FaStar, FaChartLine, FaPlay, FaPlus, FaTrash } from 'react-icons/fa';
 
 function DetalleModelo() {
   const { id } = useParams();
   const [modelFound, setModelFound] = useState(0);
   const [modelo, setModelo] = useState(null);
   const [estadoEntrenamiento, setEstadoEntrenamiento] = useState(0); // 0: no entrenado, 1: entrenando, 2: entrenado
-  const [resultado, setResultado] = useState("-");
   const [parametros, setParametros] = useState([]);
-  const [inputValues, setInputValues] = useState({}); // Store input values for prediction
   const [inputLabels, setInputLabels] = useState({}); // Store input labels for prediction
   const [scores, setScores] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [inputTables, setInputTables] = useState([{ id: Date.now(), values: {}}]);
+  const [results, setResults] = useState({});
 
   useEffect(() => {
     async function fetchModelo() {
@@ -23,12 +23,12 @@ function DetalleModelo() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        console.log("Modelo encontrado");
-        console.log(data)
+        //console.log("Modelo encontrado");
+        //console.log(data)
         setModelo(data);
         setModelFound(1);
         if (data.entrenado) {
-          console.log("Modelo entrenado");
+          //console.log("Modelo entrenado");
           setEstadoEntrenamiento(2);
           const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/parametros`);
           if (!response.ok) {
@@ -46,7 +46,7 @@ function DetalleModelo() {
           setInputLabels(labelsData);
         }
       } catch (error) {
-        console.error("Network error:", error);
+        //console.error("Network error:", error);
         setModelFound(-1);
       }
     }
@@ -69,10 +69,10 @@ function DetalleModelo() {
         return obj;
       }, {});
 
-      console.log("Scores:", sorted);
+      //console.log("Scores:", sorted);
       setScores(sorted); // Store the scores in state
     } catch (error) {
-      console.error("Error fetching scores:", error);
+      //console.error("Error fetching scores:", error);
     }
   }, [id]);
 
@@ -83,96 +83,128 @@ function DetalleModelo() {
       const data = await response.json();
       setMetrics(data); // Store metrics in state
     } catch (error) {
-      console.error("Error fetching metrics:", error);
+      //console.error("Error fetching metrics:", error);
     }
   }, [id]);
   
   useEffect(() => {
     if (estadoEntrenamiento === 2) {
-      console.log("Estado de entrenamiento:", estadoEntrenamiento);
+      //console.log("Estado de entrenamiento:", estadoEntrenamiento);
       fetchScores();
       fetchMetrics();
     }
-  }, [estadoEntrenamiento]);
+  }, [estadoEntrenamiento, fetchMetrics, fetchScores]);
+
+  useEffect(() => {
+    if (parametros.length > 0) {
+      initializeInputValues(parametros);
+    }
+  }, [parametros]);
+  
   
 
   const initializeInputValues = (params) => {
     const initialValues = {};
-    params.forEach(param => {
+    params.forEach((param) => {
       initialValues[param] = "";
     });
-    setInputValues(initialValues);
+    setInputTables((prevTables) =>
+      prevTables.map((table) => ({
+        ...table,
+        values: { ...initialValues },
+      }))
+    );
   };
 
-  const handlePredecir = useCallback(async () => {
+  const handlePredict = async (tableId) => {
+    const table = inputTables.find((t) => t.id === tableId);
+    const predictionData = table.values;
+  
     try {
-      const jsonBody = {};
-      parametros.forEach((param) => {
-        jsonBody[param] = inputValues[param];
-      });
-
       const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/predecir`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(jsonBody),
+        body: JSON.stringify(predictionData),
       });
-
+  
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
+  
       const data = await response.json();
-      setResultado(data.prediccion);
+      return data.prediccion; // Return prediction result
     } catch (error) {
-      console.error("Prediction error:", error);
-      setResultado("Error en la predicción");
+      return "Error en la predicción";
     }
-  }, [id, parametros, inputValues]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-  
-    setInputValues((prevValues) => ({
-      ...prevValues,
-      [name]: value,
-    }));
-
-    console.log(inputValues);
-  };
-
-  const handleSelectChange = (e) => {
-    const { name, value } = e.target;
-  
-    setInputValues((prevValues) => ({
-      ...prevValues,
-      [name]: value,
-    }));
   };
   
-  // Use useEffect to react to changes in inputValues
-  const checkAllFilled = useCallback(() => {
-    return parametros.every((param) => inputValues[param] !== "");
-  }, [parametros, inputValues]);
+
+  const handleAddTable = () => {
+    setInputTables((prevTables) => [
+      ...prevTables,
+      { id: Date.now(), values: {} },
+    ]);
+  };
+
+  const handleRemoveTable = (tableId) => {
+    setInputTables((prevTables) =>
+      prevTables.filter((table) => table.id !== tableId)
+    );
+  };
+
+  const isTableComplete = useCallback(
+    (table) => parametros.every((param) => table.values[param] && table.values[param] !== ""),
+    [parametros]
+  );
+
+  const handleInputChange = (tableId, name, value) => {
+    setInputTables((prevTables) =>
+      prevTables.map((table) =>
+        table.id === tableId
+          ? { ...table, values: { ...table.values, [name]: value } }
+          : table
+      )
+    );
+  };
   
+  const handleSelectChange = (tableId, name, value) => {
+    setInputTables((prevTables) =>
+      prevTables.map((table) =>
+        table.id === tableId
+          ? { ...table, values: { ...table.values, [name]: value } }
+          : table
+      )
+    );
+  };
+
+  // Use useEffect to predict when the input tables change
   useEffect(() => {
-    if (parametros.length > 0 && checkAllFilled()) {
-      handlePredecir();
-    } else {
-      setResultado("-");
-    }
-  }, [inputValues, parametros.length, checkAllFilled, handlePredecir]);
+    const updatePredictions = async () => {
+      const updatedResults = {};
+      for (const table of inputTables) {
+        if (isTableComplete(table) && parametros.length > 0) {
+          const tablePrediction = await handlePredict(table.id); // Get predictions
+          updatedResults[table.id] = tablePrediction;
+        } else {
+          updatedResults[table.id] = "-";
+        }
+      }
+      setResults(updatedResults); // Update all predictions at once
+    };
   
+    updatePredictions(); // Trigger the prediction function
+  }, [inputTables, parametros]);
 
   const handleEliminar = () => {
-    console.log("Eliminar modelo", id);
+    //console.log("Eliminar modelo", id);
     fetch(`http://127.0.0.1:8000/modelos/${id}`, {
       method: "DELETE",
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log("Modelo eliminado:", data);
+        //console.log("Modelo eliminado:", data);
         // Redirect to /modelos
         window.location.href = "/modelos";
       }
@@ -192,6 +224,8 @@ function DetalleModelo() {
       }
       );
   };
+
+  const maxColumnsPerRow = 4;
 
   return (
     <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
@@ -295,61 +329,97 @@ function DetalleModelo() {
               </Card>
             )}
             </Container>
-
+            
             {estadoEntrenamiento === 2 && (
               <Container style={{ paddingTop: '20px' }}>
-                <Row>
                 <h2>Predecir</h2>
-                <Col>
-                  <Form>
+                {inputTables.map((table) => (
+                  <div key={table.id} className="mb-4">
+                    <Row>
+                    <Col>
                     <Table bordered>
-                      <thead>
-                        <tr>
-                          <th>Parámetro</th>
-                          <th>Valor</th>
-                        </tr>
-                      </thead>
                       <tbody>
-                        {parametros.map((param) => (
-                          <tr key={param}>
-                            <td>{param}</td>
-                            <td>
-                              {inputLabels[param] ? (
-                                <Form.Select
-                                  name={param}
-                                  value={inputValues[param] || ""}
-                                  onChange={handleSelectChange}
-                                >
-                                  <option value="">Seleccionar...</option>
-                                  {inputLabels[param].map((label) => (
-                                    <option key={label} value={label}>{label}</option>
-                                  ))}
-                                </Form.Select>
-                              ) : (
-                                <Form.Control
-                                  type="number"
-                                  name={param}
-                                  value={inputValues[param] || ""}
-                                  onChange={handleInputChange}
-                                />
-                              )}
-                            </td>
-                          </tr>
+                        {Array.from({ length: Math.ceil(parametros.length / maxColumnsPerRow) }).map((_, rowIndex) => (
+                          <React.Fragment key={rowIndex}>
+                            <tr>
+                              {parametros
+                                .slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow)
+                                .map((param) => (
+                                  <th key={param}>{param}</th>
+                                ))}
+                              {Array.from({
+                                length: maxColumnsPerRow -
+                                  parametros.slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow).length,
+                              }).map((_, emptyIndex) => (
+                                <th key={`empty-header-${rowIndex}-${emptyIndex}`} />
+                              ))}
+                            </tr>
+                            <tr>
+                              {parametros
+                                .slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow)
+                                .map((param) => (
+                                  <td key={param}>
+                                    {inputLabels[param] ? (
+                                      <Form.Select
+                                        name={param}
+                                        value={table.values[param] || ""}
+                                        onChange={(e) => handleSelectChange(table.id, param, e.target.value)}
+                                      >
+                                        <option value="">Seleccionar...</option>
+                                        {inputLabels[param].map((label) => (
+                                          <option key={label} value={label}>
+                                            {label}
+                                          </option>
+                                        ))}
+                                      </Form.Select>
+                                    ) : (
+                                      <Form.Control
+                                        type="number"
+                                        name={param}
+                                        value={table.values[param] || ""}
+                                        onChange={(e) => handleInputChange(table.id, param, e.target.value)}
+                                      />
+                                    )}
+                                  </td>
+                                ))}
+                              {Array.from({
+                                length: maxColumnsPerRow -
+                                  parametros.slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow).length,
+                              }).map((_, emptyIndex) => (
+                                <td key={`empty-input-${rowIndex}-${emptyIndex}`} />
+                              ))}
+                            </tr>
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </Table>
-                  </Form>
-                </Col>
-                <Col>
-                  <h3>Resultado:</h3>
-                  <div className="resultado-cuadro">{resultado}</div>
-                </Col>
-                </Row>
+                    <div className="d-flex justify-content-between">
+                      <Button
+                        variant="danger"
+                        onClick={() => handleRemoveTable(table.id)}
+                        style={{ display: inputTables.length === 1 ? 'none' : 'inline-block' }} // Make invisible if it's the only table
+                      >
+                        <FaTrash /> Eliminar
+                      </Button>
+                    </div>
+                    </Col>
+                    <Col>
+                      <h3>Resultado:</h3>
+                      <div className="resultado-cuadro">{results[table.id]}</div>
+                    </Col>
+                    </Row>
+                  </div>
+                ))}
+                <Button variant="success" onClick={handleAddTable} className="mt-4">
+                  <FaPlus /> Agregar Tabla
+                </Button>
               </Container>
             )}
           </>
         )}
+        <div style={{ height: '200px' }}></div>
       </div>
+    
     </Container>
   );
 }

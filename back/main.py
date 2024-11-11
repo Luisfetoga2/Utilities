@@ -137,6 +137,27 @@ funcionesAlgoritmos = {
     #'Gaussian Mixture Models (GMM)': sklearn.mixture.GaussianMixture()
 }
 
+parametros_algoritmos = {
+    'Regresión Lineal': {},
+    'Regresión Ridge': {'alpha': {"type": "number", "minimum": 0.0, "default": 1.0}},
+    'Regresión Lasso': {'alpha': {"type": "number", "minimum": 0.0, "default": 1.0}},
+    'ElasticNet': {'alpha': {"type": "number", "minimum": 0.0, "default": 1.0}, 'l1_ratio': {"type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.5}},
+    'Bayesian Ridge': {'alpha_1': {"type": "number", "minimum": 0.0, "default": 1e-6}, 'alpha_2': {"type": "number", "minimum": 0.0, "default": 1e-6}, 'lambda_1': {"type": "number", "minimum": 0.0, "default": 1e-6}, 'lambda_2': {"type": "number", "minimum": 0.0, "default": 1e-6}},
+    'SVR (Máquina de Soporte Vectorial)': {'C': {"type": "number", "minimum": 0.0, "default": 1.0}, 'epsilon': {"type": "number", "minimum": 0.0, "default": 0.1}},
+    'Árbol de Decisión para Regresión': {'max_depth': {"type": "integer", "minimum": 1, "default": None}},
+    'Random Forest Regressor': {'n_estimators': {"type": "integer", "minimum": 1, "default": 100}, 'max_depth': {"type": "integer", "minimum": 1, "default": None}},
+    'Gradient Boosting Regressor': {'n_estimators': {"type": "integer", "minimum": 1, "default": 100}, 'max_depth': {"type": "integer", "minimum": 1, "default": 3}},
+    'K-Neighbors Regressor': {'n_neighbors': {"type": "integer", "minimum": 1, "default": 5}},
+    'Regresión Logística': {'C': {"type": "number", "minimum": 0.0, "default": 1.0}},
+    'Máquina de Soporte Vectorial (SVC)': {'C': {"type": "number", "minimum": 0.0, "default": 1.0}, 'gamma': {"type": "number", "minimum": 0.0, "default": 'scale'}},
+    'Árbol de Decisión': {'max_depth': {"type": "integer", "minimum": 1, "default": None}},
+    'Random Forest Classifier': {'n_estimators': {"type": "integer", "minimum": 1, "default": 100}, 'max_depth': {"type": "integer", "minimum": 1, "default": None}},
+    'Gradient Boosting Classifier': {'n_estimators': {"type": "integer", "minimum": 1, "default": 100}, 'max_depth': {"type": "integer", "minimum": 1, "default": 3}},
+    'Naive Bayes': {},
+    'K-Neighbors Classifier': {'n_neighbors': {"type": "integer", "minimum": 1, "default": 5}},
+    'Perceptrón': {'alpha': {"type": "number", "minimum": 0.0, "default": 0.0001}},
+    'Red Neuronal (MLPClassifier)': {'hidden_layer_sizes': {"type": "array", "items": {"type": "integer", "minimum": 1}, "default": [100]}, 'alpha': {"type": "number", "minimum": 0.0, "default": 0.0001}},
+}
 def actualizar_modelos():
     with open('models/models.txt', 'w') as file:
         for m in modelos:
