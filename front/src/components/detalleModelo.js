@@ -22,7 +22,6 @@ function DetalleModelo() {
   const [coeficientes, setCoeficientes] = useState(null);
   const [intercepto, setIntercepto] = useState(null);
   const [caracteristicas, setCaracteristicas] = useState(null);
-  const [distancias, setDistancias] = useState(null);
 
   useEffect(() => {
     async function fetchModelo() {
@@ -94,7 +93,6 @@ function DetalleModelo() {
       setCoeficientes(data["coeficientes"]); // Store coefficients in state
       setIntercepto(data["intercepto"]); // Store intercept in state
       setCaracteristicas(data["caracteristicas"]); // Store features in state
-      setDistancias(data["distancias"]); // Store distances in state
     } catch (error) {
       //console.error("Error fetching metrics:", error);
     }
@@ -409,24 +407,6 @@ function DetalleModelo() {
                             <tr key={caracteristica}>
                               <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
                                 {caracteristica}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </>
-                    </Col>
-                  )}
-                  {distancias && (
-                    <Col>
-                    <>
-                      <h5 className="mt-4">Distancias del Mejor Modelo:</h5>
-                      <Table borderless>
-                        <tbody>
-                          {distancias.map((distancia) => (
-                            <tr key={distancia}>
-                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
-                                {distancia}
                               </td>
                             </tr>
                           ))}

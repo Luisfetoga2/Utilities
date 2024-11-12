@@ -24,6 +24,7 @@ from sklearn.metrics import (
 import numpy as np
 import joblib
 from unidecode import unidecode
+from io import BytesIO
 
 app = FastAPI()
 
@@ -211,6 +212,9 @@ async def crear_modelo(
 
         if variable in variables_categoricas:
             variables_categoricas.remove(variable)
+        
+        variables_numericas = [col for col in variables_numericas if col in parametros.split(',')]
+        variables_categoricas = [col for col in variables_categoricas if col in parametros.split(',')]
 
         joblib.dump(variables_numericas, f'{folder_path}/numerical_columns.joblib')
         joblib.dump(variables_categoricas, f'{folder_path}/categorical_columns.joblib')
@@ -248,25 +252,29 @@ def obtener_modelo(id: int):
 @app.post("/variables", response_model=List[List[str]])
 async def obtener_variables(dataset: UploadFile = File(...)):
     # Determine the type of file and read it into a DataFrame
-    if dataset.content_type == 'text/csv' or dataset.filename.endswith('.csv'):
-        df = pd.read_csv(dataset.file)
-    elif dataset.content_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] or dataset.filename.endswith(('.xls', '.xlsx')):
-        df = pd.read_excel(dataset.file)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-    
-    # Determine whether columns are categorical or numerical
-    variables = []
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            tipo = 'categórica'
-        elif df[col].nunique() <= 10:
-            tipo = 'unknown'
+    try:
+        contents = await dataset.read()
+        if dataset.content_type == 'text/csv' or dataset.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(contents))
+        elif dataset.content_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] or dataset.filename.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(BytesIO(contents))
         else:
-            tipo = 'numérica'
-        variables.append([col, tipo])
-    
-    return variables
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+        
+        # Determine whether columns are categorical or numerical
+        variables = []
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                tipo = 'categórica'
+            elif df[col].nunique() <= 10:
+                tipo = 'unknown'
+            else:
+                tipo = 'numérica'
+            variables.append([col, tipo])
+        
+        return variables
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Retornar todos los algoritmos disponibles
 @app.get("/algoritmos", response_model=Dict[str, List[str]])
@@ -510,25 +518,17 @@ def obtener_metricas(id: int):
 
     respuesta = {"metrics": metrics[modelo.mejor_modelo]}
 
-    print(modelo.tipo)
-    print(modelo.mejor_modelo)
-
     if modelo.tipo == 'Regresión':
         if modelo.mejor_modelo in ['Regresión Lineal', 'Regresión Ridge', 'Regresión Lasso', 'ElasticNet', 'Bayesian Ridge', 'SVR (Máquina de Soporte Vectorial)']:
             respuesta['coeficientes'] = dict(sorted(zip(best_model.feature_names_in_, best_model.coef_), key=lambda item: item[1], reverse=True))
             respuesta['intercepto'] = best_model.intercept_
         elif modelo.mejor_modelo in ['Árbol de Decisión para Regresión', 'Random Forest Regressor', 'Gradient Boosting Regressor']:
             respuesta['caracteristicas'] = list(best_model.feature_importances_)
-        elif modelo.mejor_modelo == 'K-Neighbors Regressor':
-            respuesta['distancias'] = best_model.effective_metric_
     elif modelo.tipo == 'Clasificación':
         if modelo.mejor_modelo in ['Regresión Logística', 'Máquina de Soporte Vectorial (SVC)', 'Perceptrón', 'Red Neuronal (MLPClassifier)']:
             respuesta['coeficientes'] = dict(sorted(zip(best_model.feature_names_in_, best_model.coef_), key=lambda item: item[1], reverse=True))
             respuesta['intercepto'] = best_model.intercept_
         elif modelo.mejor_modelo in ['Árbol de Decisión', 'Random Forest Classifier', 'Gradient Boosting Classifier']:
             respuesta['caracteristicas'] = list(best_model.feature_importances_)
-        elif modelo.mejor_modelo == 'K-Neighbors Classifier':
-            respuesta['distancias'] = best_model.effective_metric_
 
-    print(respuesta)
     return respuesta
