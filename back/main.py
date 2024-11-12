@@ -180,7 +180,7 @@ async def crear_modelo(
     variables_numericas: str = Form(...),
     variables_categoricas: str = Form(...),
     algoritmos: str = Form(...),
-):    
+):  
     try:
         id = len(modelos) + 1
         # Extract file extension
@@ -197,8 +197,14 @@ async def crear_modelo(
         # Save parameters type:
 
         # Remove objective variable from parameters
-        variables_numericas = variables_numericas.split(',')
-        variables_categoricas = variables_categoricas.split(',')
+        if variables_numericas == "No variables":
+            variables_numericas = []
+        else:
+            variables_numericas = variables_numericas.split(',')
+        if variables_categoricas == "No variables":
+            variables_categoricas = []
+        else:
+            variables_categoricas = variables_categoricas.split(',')
 
         if variable in variables_numericas:
             variables_numericas.remove(variable)
@@ -299,10 +305,6 @@ async def entrenar_modelo(id: int):
     numerical_columns = [col for col in numerical_columns if col in X.columns]
     categorical_columns = [col for col in categorical_columns if col in X.columns]
 
-    print("Parametros: ", modelo.parametros)
-    print("Numerical columns: ", numerical_columns)
-    print("Categorical columns: ", categorical_columns)
-
     # Guardar los posibles valores de las columnas categóricas
     joblib.dump({col: sorted(X[col].unique().tolist()) for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
@@ -349,10 +351,10 @@ async def entrenar_modelo(id: int):
             rmse = np.sqrt(mse)
 
             metrics = {
-                'r2_score': r2,
-                'mae': mae,
-                'mse': mse,
-                'rmse': rmse
+                'R²': r2,
+                'Error Absoluto Medio (MAE)': mae,
+                'Error Cuadrático Medio (MSE)': mse,
+                'Raíz del Error Cuadrático Medio (RMSE)': rmse
             }
             score = r2
 
@@ -504,5 +506,29 @@ def obtener_metricas(id: int):
 
     # Load the metrics from the joblib file
     metrics = joblib.load(f'models/model{id}/metrics.joblib')
+    best_model = joblib.load(f'models/model{id}/trained_model.joblib')
 
-    return metrics[modelo.mejor_modelo]
+    respuesta = {"metrics": metrics[modelo.mejor_modelo]}
+
+    print(modelo.tipo)
+    print(modelo.mejor_modelo)
+
+    if modelo.tipo == 'Regresión':
+        if modelo.mejor_modelo in ['Regresión Lineal', 'Regresión Ridge', 'Regresión Lasso', 'ElasticNet', 'Bayesian Ridge', 'SVR (Máquina de Soporte Vectorial)']:
+            respuesta['coeficientes'] = dict(sorted(zip(best_model.feature_names_in_, best_model.coef_), key=lambda item: item[1], reverse=True))
+            respuesta['intercepto'] = best_model.intercept_
+        elif modelo.mejor_modelo in ['Árbol de Decisión para Regresión', 'Random Forest Regressor', 'Gradient Boosting Regressor']:
+            respuesta['caracteristicas'] = list(best_model.feature_importances_)
+        elif modelo.mejor_modelo == 'K-Neighbors Regressor':
+            respuesta['distancias'] = best_model.effective_metric_
+    elif modelo.tipo == 'Clasificación':
+        if modelo.mejor_modelo in ['Regresión Logística', 'Máquina de Soporte Vectorial (SVC)', 'Perceptrón', 'Red Neuronal (MLPClassifier)']:
+            respuesta['coeficientes'] = dict(sorted(zip(best_model.feature_names_in_, best_model.coef_), key=lambda item: item[1], reverse=True))
+            respuesta['intercepto'] = best_model.intercept_
+        elif modelo.mejor_modelo in ['Árbol de Decisión', 'Random Forest Classifier', 'Gradient Boosting Classifier']:
+            respuesta['caracteristicas'] = list(best_model.feature_importances_)
+        elif modelo.mejor_modelo == 'K-Neighbors Classifier':
+            respuesta['distancias'] = best_model.effective_metric_
+
+    print(respuesta)
+    return respuesta

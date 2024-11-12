@@ -166,8 +166,11 @@ function ModelosML() {
             formData.append("variable", variable);
             formData.append("tipo", tipoModelo);
             formData.append("parametros", parametros.join(","));
-            formData.append("variables_numericas", possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "numérica").join(","));
-            formData.append("variables_categoricas", possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "categorica").join(","));
+            let numericVariables = possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "numérica").join(",");
+            let categoricalVariables = possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "categorica").join(",");
+
+            formData.append("variables_numericas", numericVariables || "No variables");
+            formData.append("variables_categoricas", categoricalVariables || "No variables");
             formData.append("algoritmos", selectedAlgorithms.join(","));
 
             console.log(formData);

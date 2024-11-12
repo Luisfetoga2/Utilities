@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { Container, Button, Form, Table, Col, Row, Card, ProgressBar, Spinner, Badge } from 'react-bootstrap';
+import { Container, Button, Form, Table, Row, Card, ProgressBar, Spinner, Badge, Col } from 'react-bootstrap';
 import { FaStar, FaChartLine, FaPlay, FaPlus, FaTrash } from 'react-icons/fa';
 
 function DetalleModelo() {
@@ -14,6 +14,10 @@ function DetalleModelo() {
   const [metrics, setMetrics] = useState(null);
   const [inputTables, setInputTables] = useState([{ id: Date.now(), values: {}}]);
   const [results, setResults] = useState({});
+  const [coeficientes, setCoeficientes] = useState(null);
+  const [intercepto, setIntercepto] = useState(null);
+  const [caracteristicas, setCaracteristicas] = useState(null);
+  const [distancias, setDistancias] = useState(null);
 
   useEffect(() => {
     async function fetchModelo() {
@@ -81,7 +85,11 @@ function DetalleModelo() {
       const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/metrics`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      setMetrics(data); // Store metrics in state
+      setMetrics(data["metrics"]); // Store metrics in state
+      setCoeficientes(data["coeficientes"]); // Store coefficients in state
+      setIntercepto(data["intercepto"]); // Store intercept in state
+      setCaracteristicas(data["caracteristicas"]); // Store features in state
+      setDistancias(data["distancias"]); // Store distances in state
     } catch (error) {
       //console.error("Error fetching metrics:", error);
     }
@@ -116,9 +124,11 @@ function DetalleModelo() {
     );
   };
 
-  const handlePredict = async (tableId) => {
+  const handlePredict = useCallback(async (tableId) => {
     const table = inputTables.find((t) => t.id === tableId);
     const predictionData = table.values;
+
+    console.log("Predicción:", predictionData);
   
     try {
       const response = await fetch(`http://127.0.0.1:8000/modelos/${id}/predecir`, {
@@ -138,7 +148,7 @@ function DetalleModelo() {
     } catch (error) {
       return "Error en la predicción";
     }
-  };
+  }, [id, inputTables]);
   
 
   const handleAddTable = () => {
@@ -195,7 +205,7 @@ function DetalleModelo() {
     };
   
     updatePredictions(); // Trigger the prediction function
-  }, [inputTables, parametros]);
+  }, [inputTables, parametros, handlePredict, isTableComplete]);
 
   const handleEliminar = () => {
     //console.log("Eliminar modelo", id);
@@ -224,8 +234,6 @@ function DetalleModelo() {
       }
       );
   };
-
-  const maxColumnsPerRow = 4;
 
   return (
     <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
@@ -281,13 +289,14 @@ function DetalleModelo() {
                 </>
               )}
               {estadoEntrenamiento === 2 && (
+              <Row>
               <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '400px', margin: 'auto' }}>
                 <Card.Body className="text-center">
-                <h5 className="mt-4">Scores por Modelo:</h5>
+                <h5>Scores por Modelo:</h5>
                 <Table bordered style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f2f2f2', textAlign: 'left' }}>
-                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Modelo</th>
+                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd', width: "75%" }}>Modelo</th>
                       <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>R² Score</th>
                     </tr>
                   </thead>
@@ -300,6 +309,10 @@ function DetalleModelo() {
                     ))}
                   </tbody>
                 </Table>
+                </Card.Body>
+              </Card>
+              <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '900px', margin: 'auto' }}>
+                <Card.Body className="text-center">
                   <h3>
                     <FaStar style={{ color: '#FFD700', marginRight: '8px' }} />
                     Mejor Modelo: 
@@ -309,112 +322,169 @@ function DetalleModelo() {
                     <FaChartLine style={{ marginRight: '8px' }} />
                     Score: <span style={{ fontWeight: 'bold', color: '#007bff' }}>{modelo.score.toFixed(3)}</span>
                   </h4>
-
+                  <Row>
+                    <Col>
                   {metrics && (
                     <>
                       <h5 className="mt-4">Métricas del Mejor Modelo:</h5>
-                      <Table bordered>
+                      <Table borderless>
                         <tbody>
                           {Object.entries(metrics).map(([key, value]) => (
                             <tr key={key}>
-                              <td>{key}</td>
-                              <td>{typeof value === 'number' ? value.toFixed(3) : JSON.stringify(value)}</td>
+                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                <strong>{key+": "}</strong> {typeof value === 'number' ? value.toFixed(3) : JSON.stringify(value)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </Table>
                     </>
                   )}
+                  </Col>
+                  {coeficientes && (
+                    <Col>
+                    <>
+                      <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
+                      <Table borderless>
+                        <tbody>
+                          {Object.entries(coeficientes).map(([key, value]) => (
+                            <tr key={key}>
+                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                <strong>{key+": "}</strong> {value.toFixed(3)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </>
+                    </Col>
+                  )}
+                  {caracteristicas && (
+                    <Col>
+                    <>
+                      <h5 className="mt-4">Características del Mejor Modelo:</h5>
+                      <Table borderless>
+                        <tbody>
+                          {caracteristicas.map((caracteristica) => (
+                            <tr key={caracteristica}>
+                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                {caracteristica}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </>
+                    </Col>
+                  )}
+                  {distancias && (
+                    <Col>
+                    <>
+                      <h5 className="mt-4">Distancias del Mejor Modelo:</h5>
+                      <Table borderless>
+                        <tbody>
+                          {distancias.map((distancia) => (
+                            <tr key={distancia}>
+                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                {distancia}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </>
+                    </Col>
+                  )}
+                  </Row>
                 </Card.Body>
               </Card>
+              </Row>
             )}
             </Container>
             
             {estadoEntrenamiento === 2 && (
               <Container style={{ paddingTop: '20px' }}>
                 <h2>Predecir</h2>
-                {inputTables.map((table) => (
-                  <div key={table.id} className="mb-4">
-                    <Row>
-                    <Col>
-                    <Table bordered>
-                      <tbody>
-                        {Array.from({ length: Math.ceil(parametros.length / maxColumnsPerRow) }).map((_, rowIndex) => (
-                          <React.Fragment key={rowIndex}>
-                            <tr>
-                              {parametros
-                                .slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow)
-                                .map((param) => (
-                                  <th key={param}>{param}</th>
-                                ))}
-                              {Array.from({
-                                length: maxColumnsPerRow -
-                                  parametros.slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow).length,
-                              }).map((_, emptyIndex) => (
-                                <th key={`empty-header-${rowIndex}-${emptyIndex}`} />
-                              ))}
-                            </tr>
-                            <tr>
-                              {parametros
-                                .slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow)
-                                .map((param) => (
-                                  <td key={param}>
-                                    {inputLabels[param] ? (
-                                      <Form.Select
-                                        name={param}
-                                        value={table.values[param] || ""}
-                                        onChange={(e) => handleSelectChange(table.id, param, e.target.value)}
-                                      >
-                                        <option value="">Seleccionar...</option>
-                                        {inputLabels[param].map((label) => (
-                                          <option key={label} value={label}>
-                                            {label}
-                                          </option>
-                                        ))}
-                                      </Form.Select>
-                                    ) : (
-                                      <Form.Control
-                                        type="number"
-                                        name={param}
-                                        value={table.values[param] || ""}
-                                        onChange={(e) => handleInputChange(table.id, param, e.target.value)}
-                                      />
-                                    )}
-                                  </td>
-                                ))}
-                              {Array.from({
-                                length: maxColumnsPerRow -
-                                  parametros.slice(rowIndex * maxColumnsPerRow, (rowIndex + 1) * maxColumnsPerRow).length,
-                              }).map((_, emptyIndex) => (
-                                <td key={`empty-input-${rowIndex}-${emptyIndex}`} />
-                              ))}
-                            </tr>
-                          </React.Fragment>
+                <div className="d-flex align-items-center">
+                  <Table bordered style={{ flex: '1' }}>
+                    <thead>
+                      <tr>
+                        <th>Parámetro</th>
+                        {inputTables.map((table, index) => (
+                          <th key={table.id}>
+                            {`Predicción ${index + 1}`}
+                            <Button
+                              variant="danger"
+                              onClick={() => handleRemoveTable(table.id)}
+                              size="sm"
+                              style={{
+                                marginLeft: '10px',
+                                display: inputTables.length === 1 ? 'none' : 'inline-block',
+                              }}
+                            >
+                              <FaTrash />
+                            </Button>
+                          </th>
                         ))}
-                      </tbody>
-                    </Table>
-                    <div className="d-flex justify-content-between">
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parametros.map((param, rowIndex) => (
+                        <tr key={param}>
+                          <td>{param}</td>
+                          {inputTables.map((table) => (
+                            <td key={`${table.id}-${param}`}>
+                              {inputLabels[param] ? (
+                                <Form.Select
+                                  name={param}
+                                  value={table.values[param] || ""}
+                                  onChange={(e) => handleSelectChange(table.id, param, e.target.value)}
+                                >
+                                  <option value="">Seleccionar...</option>
+                                  {inputLabels[param].map((label) => (
+                                    <option key={label} value={label}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </Form.Select>
+                              ) : (
+                                <Form.Control
+                                  type="number"
+                                  name={param}
+                                  value={table.values[param] || ""}
+                                  onChange={(e) => handleInputChange(table.id, param, e.target.value)}
+                                />
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      <tr>
+                        <td><strong>{modelo.variable}</strong></td>
+                        {inputTables.map((table) => (
+                          <td key={`${table.id}-resultado`}>
+                            <div className="resultado-cuadro">{results[table.id]}</div>
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </Table>
+                  <div className="ms-4">
+                    {inputTables.length < 10 && (
                       <Button
-                        variant="danger"
-                        onClick={() => handleRemoveTable(table.id)}
-                        style={{ display: inputTables.length === 1 ? 'none' : 'inline-block' }} // Make invisible if it's the only table
+                        variant="success"
+                        onClick={handleAddTable}
+                        size="lg"
+                        className="d-flex align-items-center"
                       >
-                        <FaTrash /> Eliminar
+                        <FaPlus />
                       </Button>
-                    </div>
-                    </Col>
-                    <Col>
-                      <h3>Resultado:</h3>
-                      <div className="resultado-cuadro">{results[table.id]}</div>
-                    </Col>
-                    </Row>
+                    )}
                   </div>
-                ))}
-                <Button variant="success" onClick={handleAddTable} className="mt-4">
-                  <FaPlus /> Agregar Tabla
-                </Button>
+                </div>
               </Container>
             )}
+
           </>
         )}
         <div style={{ height: '200px' }}></div>
