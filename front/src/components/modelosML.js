@@ -131,11 +131,15 @@ function ModelosML() {
                 setPossibleVariables(possibleVariables);
                 setPossibleVariableTypes(possibleVariableTypes);
 
-                setFetchedPossibleVariables(1);
+                if (possibleVariableTypes.includes("unknown")) {
+                    setFetchedPossibleVariables(1);
+                } else {
+                    setFetchedPossibleVariables(2);
+                }
             } catch (error) {
                 console.error("Error al obtener las variables:", error);
                 setPossibleVariables([]);
-                setFetchedPossibleVariables(2);
+                setFetchedPossibleVariables(3);
             } finally {
                 setLoadingVariables(false); // Ocultar indicador de carga
             }
@@ -160,8 +164,10 @@ function ModelosML() {
             formData.append("nombre", nombre);
             formData.append("dataset", dataset);
             formData.append("variable", variable);
-            formData.append("parametros", parametros.join(","));
             formData.append("tipo", tipoModelo);
+            formData.append("parametros", parametros.join(","));
+            formData.append("variables_numericas", possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "numérica").join(","));
+            formData.append("variables_categoricas", possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "categorica").join(","));
             formData.append("algoritmos", selectedAlgorithms.join(","));
 
             console.log(formData);
@@ -180,6 +186,19 @@ function ModelosML() {
             navigate(`/modelos/${data.id}`);
         } catch (error) {
             console.error("Error al crear el modelo:", error);
+        }
+    };
+
+    const handleVariableTypeChange = (index, newType) => {
+        const updatedTypes = [...possibleVariableTypes];
+        updatedTypes[index] = newType; // Update the type for the specific variable
+        setPossibleVariableTypes(updatedTypes);
+    
+        // Check if all unknown types are resolved
+        if (!updatedTypes.includes("unknown")) {
+            setFetchedPossibleVariables(2);
+        } else {
+            setFetchedPossibleVariables(1);
         }
     };
 
@@ -278,9 +297,46 @@ function ModelosML() {
 
                         {loadingVariables && <p>Cargando variables...</p>}
 
-                        {fetchedPossibleVariables===2 && <p>Error al cargar las variables. Revisa el archivo</p>}
+                        {fetchedPossibleVariables===3 && <p>Error al cargar las variables. Revisa el archivo</p>}
 
-                        {fetchedPossibleVariables===1 && possibleVariables.length > 0 && (
+                        {fetchedPossibleVariables>=1 && (
+                            <Form.Group as={Row} className="mb-3">
+                                <Form.Label column sm="3">Tipos de las variables</Form.Label>
+                                <Col sm="9">
+                                    {/* Map all the possible variables and their types.
+                                    possibleVariables has the possible variables, and possibleVariableType has the type of the variables.
+                                    If the type is "numérica" or "categorica" show the variable name and a non interactive select that has the current type.
+                                    If the type is "unkown", show the variable name and a interactive select that has "numérica" or "categorica"*/}
+                                    {possibleVariables.map((variable, index) => (
+                                        <Form.Group as={Row} key={index} className="mb-3">
+                                            <Form.Label column sm="7">{variable}</Form.Label>
+                                            <Col sm="5">
+                                                {possibleVariableTypes[index] === "numérica" || possibleVariableTypes[index] === "categorica" ? (
+                                                    <Form.Control
+                                                        type="text"
+                                                        value={possibleVariableTypes[index]}
+                                                        readOnly
+                                                        disabled
+                                                    />
+                                                ) : (
+                                                    <Form.Select
+                                                        value={possibleVariableTypes[index]}
+                                                        onChange={(e) => handleVariableTypeChange(index, e.target.value)}
+                                                    >
+                                                        <option value="unknown">Seleccione un tipo</option>
+                                                        <option value="numérica">Numérica</option>
+                                                        <option value="categorica">Categórica</option>
+                                                    </Form.Select>
+                                                )}
+
+                                            </Col>
+                                        </Form.Group>
+                                    ))}
+                                </Col>
+                            </Form.Group>
+                        )}
+
+                        {fetchedPossibleVariables===2 && possibleVariables.length > 0 && (
                             <Form.Group as={Row} className="mb-3">
                                 <Form.Label column sm="3">Variable a Predecir</Form.Label>
                                 <Col sm="9">

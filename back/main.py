@@ -177,6 +177,8 @@ async def crear_modelo(
     variable: str = Form(...),
     tipo: str = Form(...),
     parametros: str = Form(...),
+    variables_numericas: str = Form(...),
+    variables_categoricas: str = Form(...),
     algoritmos: str = Form(...),
 ):    
     try:
@@ -191,6 +193,22 @@ async def crear_modelo(
         # Save file to disk
         with open(filename, 'wb') as file_object:
             file_object.write(dataset.file.read())
+        
+        # Save parameters type:
+
+        # Remove objective variable from parameters
+        variables_numericas = variables_numericas.split(',')
+        variables_categoricas = variables_categoricas.split(',')
+
+        if variable in variables_numericas:
+            variables_numericas.remove(variable)
+
+        if variable in variables_categoricas:
+            variables_categoricas.remove(variable)
+
+        joblib.dump(variables_numericas, f'{folder_path}/numerical_columns.joblib')
+        joblib.dump(variables_categoricas, f'{folder_path}/categorical_columns.joblib')
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -236,8 +254,10 @@ async def obtener_variables(dataset: UploadFile = File(...)):
     for col in df.columns:
         if df[col].dtype == 'object':
             tipo = 'categórica'
+        elif df[col].nunique() <= 10:
+            tipo = 'unknown'
         else:
-            tipo = 'categórica' if df[col].nunique() <= 10 else 'numérica'
+            tipo = 'numérica'
         variables.append([col, tipo])
     
     return variables
@@ -270,19 +290,21 @@ async def entrenar_modelo(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al leer el archivo: {str(e)}")
 
-    dataset = dataset.dropna(subset=[modelo.variable])
     X = dataset.drop(columns=modelo.variable)[modelo.parametros]
     y = dataset[modelo.variable]
 
-    categorical_columns = X.select_dtypes(include=['object']).columns
-    numerical_columns = X.select_dtypes(include=[np.number]).columns
+    numerical_columns = joblib.load(f'models/model{id}/numerical_columns.joblib')
+    categorical_columns = joblib.load(f'models/model{id}/categorical_columns.joblib')
 
-    # Guardar las columnas para predicciones futuras
-    joblib.dump(list(numerical_columns), f'models/model{id}/numerical_columns.joblib')
-    joblib.dump(list(categorical_columns), f'models/model{id}/categorical_columns.joblib')
+    numerical_columns = [col for col in numerical_columns if col in X.columns]
+    categorical_columns = [col for col in categorical_columns if col in X.columns]
+
+    print("Parametros: ", modelo.parametros)
+    print("Numerical columns: ", numerical_columns)
+    print("Categorical columns: ", categorical_columns)
 
     # Guardar los posibles valores de las columnas categóricas
-    joblib.dump({col: X[col].unique().tolist() for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
+    joblib.dump({col: sorted(X[col].unique().tolist()) for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
     # Imputar valores faltantes
     X[categorical_columns] = X[categorical_columns].applymap(lambda x: unidecode(str(x).lower()) if isinstance(x, str) else x)
