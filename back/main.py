@@ -61,6 +61,9 @@ class Modelo(BaseModel):
 modelos = []
 
 # Load models from models.txt
+# Chek if folder exists
+if not os.path.exists('models'):
+    os.makedirs('models')
 # Check if the file exists
 if not os.path.exists('models/models.txt'):
     with open('models/models.txt', 'w') as file:
