@@ -290,14 +290,25 @@ function DetalleModelo() {
 
     fetch(`http://127.0.0.1:8000/modelos/${id}/entrenar`, {
       method: "POST",
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        // Reload the page to show the new state
-        window.location.reload();
-      }
-      );
+    }).catch((error) => {});
   };
+
+  // If estadoEntrenamiento is 1, fetch "/modelos/{id}/entrenamiento" every second, if "message" is "Modelo entrenado exitosamente", reload the page
+  useEffect(() => {
+    if (estadoEntrenamiento === 1) {
+      const interval = setInterval(() => {
+        fetch(`http://127.0.0.1:8000/modelos/${id}/entrenamiento`)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.message === "Modelo entrenado exitosamente") {
+              clearInterval(interval);
+              window.location.reload();
+            }
+          });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [estadoEntrenamiento, id]);
 
   const BarGraph = ({ coeficientes }) => {
     const values = Object.values(coeficientes);
@@ -333,7 +344,7 @@ function DetalleModelo() {
         datalabels: {
           anchor: 'end',
           align: 'end',
-          formatter: (value) => value.toFixed(2),
+          formatter: (value) => value.toFixed(4),
         },
       },
     };
@@ -438,7 +449,7 @@ function DetalleModelo() {
                           {Object.entries(metrics).map(([key, value]) => (
                             <tr key={key}>
                               <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
-                                <strong>{key+": "}</strong> {typeof value === 'number' ? value.toFixed(3) : JSON.stringify(value)}
+                                <strong>{key+": "}</strong> {typeof value === 'number' ? value.toFixed(4) : JSON.stringify(value)}
                               </td>
                             </tr>
                           ))}
@@ -453,7 +464,7 @@ function DetalleModelo() {
                       <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
                       <BarGraph coeficientes={coeficientes} />
                       <p style={{ textAlign: 'center', marginTop: '10px' }}>
-                        Intercepto: <strong>{intercepto.toFixed(3)}</strong>
+                        Intercepto: <strong>{intercepto.toFixed(4)}</strong>
                       </p>
                     </>
                     </Col>

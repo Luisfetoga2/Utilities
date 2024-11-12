@@ -191,18 +191,6 @@ async def crear_modelo(
     algoritmos: str = Form(...),
 ):  
     try:
-        id = len(modelos) + 1
-        # Extract file extension
-        file_extension = os.path.splitext(dataset.filename)[1]
-        # Create folder under /models: /models/model{id}/
-        folder_path = f'models/model{id}'
-        os.makedirs(folder_path, exist_ok=True)
-        # Construct the filename with the appropriate extension
-        filename = f'{folder_path}/dataset{file_extension}'
-        # Save file to disk
-        with open(filename, 'wb') as file_object:
-            file_object.write(dataset.file.read())
-        
         # Save parameters type:
 
         # Remove objective variable from parameters
@@ -223,6 +211,32 @@ async def crear_modelo(
         
         variables_numericas = [col for col in variables_numericas if col in parametros.split(',')]
         variables_categoricas = [col for col in variables_categoricas if col in parametros.split(',')]
+
+        id = len(modelos) + 1
+        # Extract file extension
+        file_extension = os.path.splitext(dataset.filename)[1]
+        # Create folder under /models: /models/model{id}/
+        folder_path = f'models/model{id}'
+        os.makedirs(folder_path, exist_ok=True)
+        # Construct the filename with the appropriate extension
+        filename = f'{folder_path}/dataset{file_extension}'
+        # Save file to disk
+        contents = await dataset.read()
+        if dataset.content_type == 'text/csv' or dataset.filename.endswith('.csv'):
+            df = pd.read_csv(BytesIO(contents))
+        elif dataset.content_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] or dataset.filename.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(BytesIO(contents))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+        
+        # Transform categorical columns to str
+        df[variables_categoricas] = df[variables_categoricas].astype(str)
+
+        # Save the dataset to disk
+        if file_extension == '.csv':
+            df.to_csv(filename, index=False)
+        elif file_extension in ['.xls', '.xlsx']:
+            df.to_excel(filename, index=False)
 
         joblib.dump(variables_numericas, f'{folder_path}/numerical_columns.joblib')
         joblib.dump(variables_categoricas, f'{folder_path}/categorical_columns.joblib')
@@ -272,7 +286,11 @@ async def obtener_variables(dataset: UploadFile = File(...)):
         # Determine whether columns are categorical or numerical
         variables = []
         for col in df.columns:
-            print(col, df[col].dtype)
+            
+            # If the values are all NaN, skip the column
+            if df[col].isnull().all():
+                continue
+
             if df[col].dtype == 'object':
                 tipo = 'categórica'
             elif df[col].nunique() <= 10:
@@ -313,6 +331,9 @@ async def entrenar_modelo(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al leer el archivo: {str(e)}")
 
+    # Drop rows with missing values in the target variable
+    dataset = dataset.dropna(subset=[modelo.variable])
+
     X = dataset.drop(columns=modelo.variable)[modelo.parametros]
     y = dataset[modelo.variable]
 
@@ -322,7 +343,14 @@ async def entrenar_modelo(id: int):
     numerical_columns = [col for col in numerical_columns if col in X.columns]
     categorical_columns = [col for col in categorical_columns if col in X.columns]
 
+    if set(modelo.parametros) != set(numerical_columns + categorical_columns):
+        raise HTTPException(status_code=407, detail="Los parámetros del modelo no coinciden con las columnas del dataset")
+
     # Guardar los posibles valores de las columnas categóricas
+    for col in categorical_columns:
+        # If there is a number in the unique values, convert it to string
+        if any(isinstance(x, (int, float)) for x in X[col].unique()):
+            X[col] = X[col].astype(str)
     joblib.dump({col: sorted(X[col].unique().tolist()) for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
     # Imputar valores faltantes
@@ -330,9 +358,15 @@ async def entrenar_modelo(id: int):
     X[numerical_columns] = X[numerical_columns].fillna(X[numerical_columns].median())
     X[categorical_columns] = X[categorical_columns].fillna("Desconocido")
 
-    encoder = preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
+    encoder = preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore', max_categories=10)
     encoded_data = encoder.fit_transform(X[categorical_columns])
     encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out(categorical_columns))
+
+    # Check if there is a NaN in the encoded data
+    if X[numerical_columns].isnull().values.any():
+        # PRint the columns with NaN
+        print(X[numerical_columns].isnull().sum())
+        raise HTTPException(status_code=500, detail="Error al codificar las columnas categóricas")
 
     # Guardar el encoder y las columnas codificadas
     joblib.dump(encoder, f'models/model{id}/encoder.joblib')
@@ -419,7 +453,15 @@ async def entrenar_modelo(id: int):
     modelo.score = best_score
     actualizar_modelos()
 
-    return {"message": "Modelo entrenado exitosamente", "mejor_modelo": mejor_modelo, "score": best_score}
+@app.get("/modelos/{id}/entrenamiento")
+def obtener_entrenamiento(id: int):
+    modelo = next((m for m in modelos if m.id == id), None)
+    if modelo is None:
+        raise HTTPException(status_code=404, detail="Modelo no encontrado")
+    if modelo.entrenado:
+        return {"message": "Modelo entrenado exitosamente", "mejor_modelo": modelo.mejor_modelo, "score": modelo.score}
+    else:
+        return {"message": "Modelo no entrenado"}
 
 @app.post("/modelos/{id}/predecir")
 async def predecir(id: int, datos: dict):
@@ -466,7 +508,7 @@ async def predecir(id: int, datos: dict):
     prediction = model.predict(input_data)
 
     if len(prediction) == 1:
-        prediction = round(prediction[0], 3)
+        prediction = round(prediction[0], 4)
 
     return {"prediccion": prediction.tolist()}
 
