@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate  } from "react-router-dom";
-import { Modal, Container, Form, Row, Col, Button } from 'react-bootstrap';
+import { Modal, Container, Form, Row, Col, Button, Spinner } from 'react-bootstrap';
 import './modelosML.css';
 
 function ModelosML() {
@@ -45,6 +45,8 @@ function ModelosML() {
 
     const [algorithmOptions, setAlgorithmOptions] = useState({});
     const [selectedAlgorithms, setSelectedAlgorithms] = useState([]);
+
+    const [apiStatus, setApiStatus] = useState("checking");
 
     const handleClose = () => {
         setShowNewModelForm(false);
@@ -147,16 +149,40 @@ function ModelosML() {
     };
 
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/modelos") // FastAPI URL
-            .then(response => response.json())
-            .then(data => setModelos(data))
-            .catch(error => console.error("Error al obtener los modelos:", error));
-        
-        fetch("http://127.0.0.1:8000/algoritmos") // FastAPI URL
-            .then(response => response.json())
-            .then(data => setAlgorithmOptions(data))
-            .catch(error => console.error("Error al obtener los algoritmos:", error));
-    }, []);
+        const checkApiStatus = async () => {
+            try {
+                const response = await fetch("http://127.0.0.1:8000/state");
+                const data = await response.json();
+                if (data.message === "API en funcionamiento") {
+                    setApiStatus("running");
+                    fetch("http://127.0.0.1:8000/modelos") // FastAPI URL
+                        .then(response => response.json())
+                        .then(data => setModelos(data))
+                        .catch(error => console.error("Error al obtener los modelos:", error));
+
+                    fetch("http://127.0.0.1:8000/algoritmos") // FastAPI URL
+                        .then(response => response.json())
+                        .then(data => setAlgorithmOptions(data))
+                        .catch(error => console.error("Error al obtener los algoritmos:", error));
+                } else {
+                    setApiStatus("initializing");
+                }
+            } catch (error) {
+                console.error("Error al verificar el estado de la API:", error);
+                setApiStatus("initializing");
+            }
+        };
+
+        checkApiStatus();
+
+        const interval = setInterval(() => {
+            if (apiStatus === "initializing") {
+                checkApiStatus();
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [apiStatus]);
 
     const handleSubmit = async (e) => {
         try{
@@ -217,6 +243,19 @@ function ModelosML() {
     const handleRowClick = (id) => {
         navigate(`/modelos/${id}`); // Redirige al detalle del modelo
     };
+
+    if (apiStatus === "initializing" || apiStatus === "checking") {
+        return (
+            <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                <div className="text-center">
+                    <Spinner animation="border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </Spinner>
+                    <p>Se está inicializando el servidor</p>
+                </div>
+            </Container>
+        );
+    }
 
     return (
         <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>

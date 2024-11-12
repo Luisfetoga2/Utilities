@@ -171,6 +171,10 @@ def actualizar_modelos():
 
 normalizar = False
 
+@app.get("/state")
+def obtener_estado():
+    return {"message": "API en funcionamiento"}
+
 @app.get("/modelos", response_model=List[Modelo])
 def obtener_modelos():
     return modelos
