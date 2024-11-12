@@ -166,6 +166,7 @@ def actualizar_modelos():
                        f"{m.tipo};{','.join(m.parametros)};{','.join(m.algoritmos)};"
                        f"{m.entrenado};{m.fecha_creacion};{m.mejor_modelo};{m.score}\n")
 
+normalizar = False
 
 @app.get("/modelos", response_model=List[Modelo])
 def obtener_modelos():
@@ -332,11 +333,13 @@ async def entrenar_modelo(id: int):
 
     # Concatenar datos numéricos y codificados
     X = pd.concat([X[numerical_columns].reset_index(drop=True), encoded_df], axis=1)
-    scaler = preprocessing.StandardScaler()
-    X[numerical_columns] = scaler.fit_transform(X[numerical_columns])
 
-    # Guardar el escalador y las columnas finales
-    joblib.dump(scaler, f'models/model{id}/scaler.joblib')
+    if normalizar:
+        scaler = preprocessing.StandardScaler()
+        X[numerical_columns] = scaler.fit_transform(X[numerical_columns])
+
+        # Guardar el escalador y las columnas finales
+        joblib.dump(scaler, f'models/model{id}/scaler.joblib')
     joblib.dump(list(X.columns), f'models/model{id}/feature_columns.joblib')
 
     # Dividir los datos en entrenamiento y prueba
@@ -413,7 +416,8 @@ async def predecir(id: int, datos: dict):
 
     # Load the trained model, scaler, encoder, and feature columns
     model = joblib.load(f'models/model{id}/trained_model.joblib')
-    scaler = joblib.load(f'models/model{id}/scaler.joblib')
+    if normalizar:
+        scaler = joblib.load(f'models/model{id}/scaler.joblib')
     encoder = joblib.load(f'models/model{id}/encoder.joblib')
     encoder_feature_names = joblib.load(f'models/model{id}/encoder_feature_names.joblib')
     categorical_columns = joblib.load(f'models/model{id}/categorical_columns.joblib')
@@ -442,7 +446,8 @@ async def predecir(id: int, datos: dict):
     input_data = input_data.reindex(columns=feature_columns, fill_value=0)
 
     # Escalar las columnas numéricas
-    input_data[numerical_columns] = scaler.transform(input_data[numerical_columns])
+    if normalizar:
+        input_data[numerical_columns] = scaler.transform(input_data[numerical_columns])
 
     # Realizar la predicción
     prediction = model.predict(input_data)

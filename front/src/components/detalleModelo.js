@@ -211,18 +211,18 @@ function DetalleModelo() {
   }, [inputTables, parametros, handlePredict, isTableComplete]);
 
   const handleEliminar = () => {
-    //console.log("Eliminar modelo", id);
-    fetch(`http://127.0.0.1:8000/modelos/${id}`, {
-      method: "DELETE",
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        //console.log("Modelo eliminado:", data);
-        // Redirect to /modelos
-        window.location.href = "/modelos";
-      }
-    );
-  };
+    if (window.confirm("Estas seguro que desea eliminar este modelo?")) {
+        fetch(`http://127.0.0.1:8000/modelos/${id}`, {
+            method: "DELETE",
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            //console.log("Modelo eliminado:", data);
+            // Redirect to /modelos
+            window.location.href = "/modelos";
+        });
+    }
+};
 
   const handleEntrenar = () => {
     setEstadoEntrenamiento(1);
