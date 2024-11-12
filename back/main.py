@@ -264,6 +264,7 @@ async def obtener_variables(dataset: UploadFile = File(...)):
         # Determine whether columns are categorical or numerical
         variables = []
         for col in df.columns:
+            print(col, df[col].dtype)
             if df[col].dtype == 'object':
                 tipo = 'categórica'
             elif df[col].nunique() <= 10:
@@ -445,6 +446,9 @@ async def predecir(id: int, datos: dict):
 
     # Realizar la predicción
     prediction = model.predict(input_data)
+
+    if len(prediction) == 1:
+        prediction = round(prediction[0], 3)
 
     return {"prediccion": prediction.tolist()}
 

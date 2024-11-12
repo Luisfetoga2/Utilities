@@ -167,7 +167,7 @@ function ModelosML() {
             formData.append("tipo", tipoModelo);
             formData.append("parametros", parametros.join(","));
             let numericVariables = possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "numérica").join(",");
-            let categoricalVariables = possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "categorica").join(",");
+            let categoricalVariables = possibleVariables.filter((variable, index) => possibleVariableTypes[index] === "categórica").join(",");
 
             formData.append("variables_numericas", numericVariables || "No variables");
             formData.append("variables_categoricas", categoricalVariables || "No variables");
@@ -314,7 +314,7 @@ function ModelosML() {
                                         <Form.Group as={Row} key={index} className="mb-3">
                                             <Form.Label column sm="7">{variable}</Form.Label>
                                             <Col sm="5">
-                                                {possibleVariableTypes[index] === "numérica" || possibleVariableTypes[index] === "categorica" ? (
+                                                {possibleVariableTypes[index] === "numérica" || possibleVariableTypes[index] === "categórica" ? (
                                                     <Form.Control
                                                         type="text"
                                                         value={possibleVariableTypes[index]}
@@ -328,7 +328,7 @@ function ModelosML() {
                                                     >
                                                         <option value="unknown">Seleccione un tipo</option>
                                                         <option value="numérica">Numérica</option>
-                                                        <option value="categorica">Categórica</option>
+                                                        <option value="categórica">Categórica</option>
                                                     </Form.Select>
                                                 )}
 

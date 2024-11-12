@@ -483,7 +483,7 @@ function DetalleModelo() {
                         <td><strong>{modelo.variable}</strong></td>
                         {inputTables.map((table) => (
                           <td key={`${table.id}-resultado`}>
-                            <div className="resultado-cuadro">{results[table.id]}</div>
+                            <div className="resultado-cuadro">{ results[table.id] }</div>
                           </td>
                         ))}
                       </tr>
