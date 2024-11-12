@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { Container, Button, Form, Table, Row, Card, ProgressBar, Spinner, Badge, Col } from 'react-bootstrap';
 import { FaStar, FaChartLine, FaPlay, FaPlus, FaTrash } from 'react-icons/fa';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import BarGraph from "./BarGraph";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartDataLabels);
 
@@ -309,48 +310,11 @@ function DetalleModelo() {
       return () => clearInterval(interval);
     }
   }, [estadoEntrenamiento, id]);
-
-  const BarGraph = ({ coeficientes }) => {
-    const values = Object.values(coeficientes);
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
-    const padding = (maxValue - minValue) * 0.25; // 10% padding
   
-    const data = {
-      labels: Object.keys(coeficientes),
-      datasets: [
-        {
-          data: values,
-          backgroundColor: values.map(value => value >= 0 ? 'rgba(75, 192, 192, 0.2)' : 'rgba(255, 99, 132, 0.2)'),
-          borderColor: values.map(value => value >= 0 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)'),
-          borderWidth: 1,
-        },
-      ],
-    };
+  const memoizedCoeficientes = useMemo(() => {
+    return coeficientes ? { ...coeficientes } : null;
+  }, [coeficientes]);
   
-    const options = {
-      indexAxis: 'y',
-      scales: {
-        x: {
-          beginAtZero: false,
-          min: minValue - padding,
-          max: maxValue + padding,
-        },
-      },
-      plugins: {
-        legend: {
-          display: false,
-        },
-        datalabels: {
-          anchor: 'end',
-          align: 'end',
-          formatter: (value) => value.toFixed(4),
-        },
-      },
-    };
-  
-    return <Bar data={data} options={options} />;
-  };
 
   return (
     <Container fluid className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
@@ -460,13 +424,13 @@ function DetalleModelo() {
                   </Col>
                   {coeficientes && (
                     <Col>
-                    <>
-                      <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
-                      <BarGraph coeficientes={coeficientes} />
-                      <p style={{ textAlign: 'center', marginTop: '10px' }}>
-                        Intercepto: <strong>{intercepto.toFixed(4)}</strong>
-                      </p>
-                    </>
+                      <>
+                        <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
+                        <BarGraph coeficientes={memoizedCoeficientes} />
+                        <p style={{ textAlign: 'center', marginTop: '10px' }}>
+                          Intercepto: <strong>{intercepto.toFixed(4)}</strong>
+                        </p>
+                      </>
                     </Col>
                   )}
                   {caracteristicas && (
