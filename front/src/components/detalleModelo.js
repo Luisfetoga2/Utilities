@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Container, Button, Form, Table, Row, Card, ProgressBar, Spinner, Badge, Col } from 'react-bootstrap';
 import { FaStar, FaChartLine, FaPlay, FaPlus, FaTrash } from 'react-icons/fa';
@@ -22,6 +22,7 @@ function DetalleModelo() {
   const [coeficientes, setCoeficientes] = useState(null);
   const [intercepto, setIntercepto] = useState(null);
   const [caracteristicas, setCaracteristicas] = useState(null);
+  const inputRefs = useRef({});
 
   useEffect(() => {
     async function fetchModelo() {
@@ -161,11 +162,71 @@ function DetalleModelo() {
     ]);
   };
 
+  const handleKeyDown = (e, tableId, param) => {
+    if (e.key === "Tab") {
+      e.preventDefault(); // Prevent default tab behavior
+  
+      // Get the current row and column index
+      const tableIndex = inputTables.findIndex((table) => table.id === tableId);
+      const paramIndex = parametros.indexOf(param);
+
+      const isShiftPressed = e.shiftKey;
+
+      var nextTableIndex;
+      var nextParamIndex;
+      
+      if (!isShiftPressed) {
+        // Calculate the next row
+        nextParamIndex = paramIndex + 1;
+    
+        // If we're at the last row, move to the next column
+        if (nextParamIndex >= parametros.length) {
+          nextParamIndex = 0; // Wrap to the first row
+          nextTableIndex = tableIndex + 1;
+          if (nextTableIndex >= inputTables.length) {
+            nextTableIndex = 0; // Wrap to the first column 
+          }
+          tableId = inputTables[nextTableIndex].id;
+        }
+      } else {
+        // Calculate the previous row
+        nextParamIndex = paramIndex - 1;
+
+        // If we're at the first row, move to the previous column
+        if (nextParamIndex < 0) {
+          nextParamIndex = parametros.length - 1; // Wrap to the last row
+          nextTableIndex = tableIndex - 1;
+          if (nextTableIndex < 0) {
+            nextTableIndex = inputTables.length - 1; // Wrap to the last column
+          }
+          tableId = inputTables[nextTableIndex].id;
+        }
+      }
+  
+      // Find the next input ref
+      const nextRefKey = `${tableId}-${parametros[nextParamIndex]}`;
+      const nextRef = inputRefs.current[nextRefKey];
+  
+      if (nextRef) {
+        nextRef.focus();
+      }
+    }
+  };
+  
+
   const handleRemoveTable = (tableId) => {
+    // Remove the table and associated refs
+    Object.keys(inputRefs.current).forEach((key) => {
+      if (key.startsWith(`${tableId}-`)) {
+        delete inputRefs.current[key];
+      }
+    });
+  
     setInputTables((prevTables) =>
       prevTables.filter((table) => table.id !== tableId)
     );
   };
+  
 
   const isTableComplete = useCallback(
     (table) => parametros.every((param) => table.values[param] && table.values[param] !== ""),
@@ -473,6 +534,12 @@ function DetalleModelo() {
                                   name={param}
                                   value={table.values[param] || ""}
                                   onChange={(e) => handleInputChange(table.id, param, e.target.value)}
+                                  onKeyDown={(e) => handleKeyDown(e, table.id, param)}
+                                  ref={(el) => {
+                                    if (el) {
+                                      inputRefs.current[`${table.id}-${param}`] = el;
+                                    }
+                                  }}
                                 />
                               )}
                             </td>

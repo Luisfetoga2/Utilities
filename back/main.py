@@ -345,8 +345,12 @@ async def entrenar_modelo(id: int):
         joblib.dump(scaler, f'models/model{id}/scaler.joblib')
     joblib.dump(list(X.columns), f'models/model{id}/feature_columns.joblib')
 
+    if modelo.tipo == 'Clasificación':
     # Dividir los datos en entrenamiento y prueba
-    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
+        X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
+    else:
+        X_train = X
+        y_train = y
 
     best_score = 0
     best_model = None
@@ -357,12 +361,12 @@ async def entrenar_modelo(id: int):
     for algoritmo in modelo.algoritmos:
         model = funcionesAlgoritmos[algoritmo]()
         model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
 
         if modelo.tipo == 'Regresión':
-            r2 = r2_score(y_test, y_pred)
-            mae = mean_absolute_error(y_test, y_pred)
-            mse = mean_squared_error(y_test, y_pred)
+            y_pred = model.predict(X_train)
+            r2 = r2_score(y_train, y_pred)
+            mae = mean_absolute_error(y_train, y_pred)
+            mse = mean_squared_error(y_train, y_pred)
             rmse = np.sqrt(mse)
 
             metrics = {
@@ -374,6 +378,8 @@ async def entrenar_modelo(id: int):
             score = r2
 
         elif modelo.tipo == 'Clasificación':
+            y_pred = model.predict(X_test)
+
             accuracy = accuracy_score(y_test, y_pred)
             precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
             recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
