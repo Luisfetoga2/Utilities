@@ -1,7 +1,7 @@
 function Menu() {
 
     return (
-        <div>Hola</div>
+        <div>Menu principal</div>
     )
 }
 
