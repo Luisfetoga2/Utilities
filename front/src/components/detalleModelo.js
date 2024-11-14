@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import { useParams } from "react-router-dom";
 import { Container, Button, Form, Table, Row, Card, ProgressBar, Spinner, Badge, Col } from 'react-bootstrap';
 import { FaStar, FaChartLine, FaPlay, FaPlus, FaTrash } from 'react-icons/fa';
-import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import BarGraph from "./BarGraph";
@@ -24,6 +23,7 @@ function DetalleModelo() {
   const [intercepto, setIntercepto] = useState(null);
   const [caracteristicas, setCaracteristicas] = useState(null);
   const inputRefs = useRef({});
+  const [columnasEliminadas, setColumnasEliminadas] = useState([]);
 
   useEffect(() => {
     async function fetchModelo() {
@@ -54,6 +54,13 @@ function DetalleModelo() {
           }
           const labelsData = await labelsResponse.json();
           setInputLabels(labelsData);
+
+          const columnasEliminadasResponse = await fetch(`http://127.0.0.1:8000/modelos/${id}/columnasEliminadas`);
+          if (!columnasEliminadasResponse.ok) {
+            throw new Error(`HTTP error! status: ${columnasEliminadasResponse.status}`);
+          }
+          const columnasEliminadasData = await columnasEliminadasResponse.json();
+          setColumnasEliminadas(columnasEliminadasData);
         }
       } catch (error) {
         //console.error("Network error:", error);
@@ -370,91 +377,103 @@ function DetalleModelo() {
                 </>
               )}
               {estadoEntrenamiento === 2 && (
-              <Row>
-              <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '400px', margin: 'auto' }}>
-                <Card.Body className="text-center">
-                <h5>Scores por Modelo:</h5>
-                <Table bordered style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f2f2f2', textAlign: 'left' }}>
-                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd', width: "75%" }}>Modelo</th>
-                      <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>R² Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scores && Object.entries(scores).map(([modelName, score]) => (
-                      <tr key={modelName} style={{ borderBottom: '1px solid #ddd' }}>
-                        <td style={{ padding: '10px' }}>{modelName}</td>
-                        <td style={{ padding: '10px' }}>{score.toFixed(3)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-                </Card.Body>
-              </Card>
-              <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '900px', margin: 'auto' }}>
-                <Card.Body className="text-center">
-                  <h3>
-                    <FaStar style={{ color: '#FFD700', marginRight: '8px' }} />
-                    Mejor Modelo: 
-                    <Badge bg="info" className="ms-2">{modelo.mejor_modelo}</Badge>
-                  </h3>
-                  <h4 className="mt-3">
-                    <FaChartLine style={{ marginRight: '8px' }} />
-                    Score: <span style={{ fontWeight: 'bold', color: '#007bff' }}>{modelo.score.toFixed(3)}</span>
-                  </h4>
+                <>
+                  {columnasEliminadas.length > 0 && (
+                    <p style={{ opacity: "40%" }}>
+                      Se eliminaron las siguientes columnas por tener un valor p mayor a 0.05:<br />
+                      {columnasEliminadas.map((col) => col.join(" (")+")").join(", ")}
+                    </p>
+                  )}
                   <Row>
                     <Col>
-                  {metrics && (
-                    <>
-                      <h5 className="mt-4">Métricas del Mejor Modelo:</h5>
-                      <Table borderless>
-                        <tbody>
-                          {Object.entries(metrics).map(([key, value]) => (
-                            <tr key={key}>
-                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
-                                <strong>{key+": "}</strong> {typeof value === 'number' ? value.toFixed(4) : JSON.stringify(value)}
-                              </td>
+                      <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '400px', margin: 'auto' }}>
+                        <Card.Body className="text-center">
+                        <h5>Scores por Modelo:</h5>
+                        <Table bordered style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f2f2f2', textAlign: 'left' }}>
+                              <th style={{ padding: '10px', borderBottom: '2px solid #ddd', width: "75%" }}>Modelo</th>
+                              <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>R² Score</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </>
-                  )}
-                  </Col>
-                  {coeficientes && (
-                    <Col>
-                      <>
-                        <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
-                        <BarGraph coeficientes={memoizedCoeficientes} />
-                        <p style={{ textAlign: 'center', marginTop: '10px' }}>
-                          Intercepto: <strong>{intercepto.toFixed(4)}</strong>
-                        </p>
-                      </>
+                          </thead>
+                          <tbody>
+                            {scores && Object.entries(scores).map(([modelName, score]) => (
+                              <tr key={modelName} style={{ borderBottom: '1px solid #ddd' }}>
+                                <td style={{ padding: '10px' }}>{modelName}</td>
+                                <td style={{ padding: '10px' }}>{score.toFixed(3)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                        </Card.Body>
+                      </Card>
                     </Col>
-                  )}
-                  {caracteristicas && (
-                    <Col>
-                    <>
-                      <h5 className="mt-4">Características del Mejor Modelo:</h5>
-                      <Table borderless>
-                        <tbody>
-                          {caracteristicas.map((caracteristica) => (
-                            <tr key={caracteristica}>
-                              <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
-                                {caracteristica}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </>
+                    <Col xs={9}>
+                      <Card className="mt-4 shadow-sm" border="primary" style={{ maxWidth: '900px', margin: 'auto' }}>
+                        <Card.Body className="text-center">
+                          <h3>
+                            <FaStar style={{ color: '#FFD700', marginRight: '8px' }} />
+                            Mejor Modelo: 
+                            <Badge bg="info" className="ms-2">{modelo.mejor_modelo}</Badge>
+                          </h3>
+                          <h4 className="mt-3">
+                            <FaChartLine style={{ marginRight: '8px' }} />
+                            Score: <span style={{ fontWeight: 'bold', color: '#007bff' }}>{modelo.score.toFixed(3)}</span>
+                          </h4>
+                          <Row>
+                            <Col>
+                          {metrics && (
+                            <>
+                              <h5 className="mt-4">Métricas del Mejor Modelo:</h5>
+                              <Table borderless>
+                                <tbody>
+                                  {Object.entries(metrics).map(([key, value]) => (
+                                    <tr key={key}>
+                                      <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                        <strong>{key+": "}</strong> {typeof value === 'number' ? value.toFixed(4) : JSON.stringify(value)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Table>
+                            </>
+                          )}
+                          </Col>
+                          {coeficientes && (
+                            <Col>
+                              <>
+                                <h5 className="mt-4">Coeficientes del Mejor Modelo:</h5>
+                                <BarGraph coeficientes={memoizedCoeficientes} />
+                                <p style={{ textAlign: 'center', marginTop: '10px' }}>
+                                  Intercepto: <strong>{intercepto.toFixed(4)}</strong>
+                                </p>
+                              </>
+                            </Col>
+                          )}
+                          {caracteristicas && (
+                            <Col>
+                            <>
+                              <h5 className="mt-4">Características del Mejor Modelo:</h5>
+                              <Table borderless>
+                                <tbody>
+                                  {caracteristicas.map((caracteristica) => (
+                                    <tr key={caracteristica}>
+                                      <td style={{ textAlign: 'left', paddingLeft: "10px" }}>
+                                        {caracteristica}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Table>
+                            </>
+                            </Col>
+                          )}
+                          </Row>
+                        </Card.Body>
+                      </Card>
                     </Col>
-                  )}
                   </Row>
-                </Card.Body>
-              </Card>
-              </Row>
+              </>
             )}
             </Container>
             

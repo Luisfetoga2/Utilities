@@ -5,6 +5,7 @@ import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import time
+from scipy import stats
 import sklearn
 from sklearn import linear_model
 from sklearn import preprocessing
@@ -358,15 +359,36 @@ async def entrenar_modelo(id: int):
     X[numerical_columns] = X[numerical_columns].fillna(X[numerical_columns].median())
     X[categorical_columns] = X[categorical_columns].fillna("Desconocido")
 
+    # Sacar valores p de las columnas, y quitar las que son < 0.05
+    columnas_eliminadas = []
+    if modelo.tipo == "Regresión":
+        while True:
+            p_values = []
+            for col in X.columns:
+                if col in numerical_columns:
+                    _, p = stats.pearsonr(X[col], y)
+                else:
+                    _, p = stats.f_oneway(*[X.loc[X[col] == val, y.name] for val in X[col].unique()])
+                p_values.append(p)
+            if max(p_values) <= 0.05:
+                break
+            columna_a_eliminar = X.columns[p_values.index(max(p_values))]
+            columnas_eliminadas.append(['"'+columna_a_eliminar+'"', round(max(p_values), 3)])
+            X = X.drop(columns=columna_a_eliminar)
+    
+    joblib.dump(columnas_eliminadas, f'models/model{id}/columnas_eliminadas.joblib')
+
+
+    # Actualizar las columnas numéricas y categóricas
+    numerical_columns = [col for col in numerical_columns if col in X.columns]
+    categorical_columns = [col for col in categorical_columns if col in X.columns]
+
+    joblib.dump(numerical_columns, f'models/model{id}/numerical_columns.joblib')
+    joblib.dump(categorical_columns, f'models/model{id}/categorical_columns.joblib')
+
     encoder = preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore', max_categories=10)
     encoded_data = encoder.fit_transform(X[categorical_columns])
     encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out(categorical_columns))
-
-    # Check if there is a NaN in the encoded data
-    if X[numerical_columns].isnull().values.any():
-        # PRint the columns with NaN
-        print(X[numerical_columns].isnull().sum())
-        raise HTTPException(status_code=500, detail="Error al codificar las columnas categóricas")
 
     # Guardar el encoder y las columnas codificadas
     joblib.dump(encoder, f'models/model{id}/encoder.joblib')
@@ -452,6 +474,14 @@ async def entrenar_modelo(id: int):
     modelo.mejor_modelo = mejor_modelo
     modelo.score = best_score
     actualizar_modelos()
+
+@app.get("/modelos/{id}/columnasEliminadas")
+def obtener_columnas_eliminadas(id: int):
+    try:
+        columnas_eliminadas = joblib.load(f'models/model{id}/columnas_eliminadas.joblib')
+        return columnas_eliminadas
+    except:
+        return []
 
 @app.get("/modelos/{id}/entrenamiento")
 def obtener_entrenamiento(id: int):
