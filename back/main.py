@@ -355,7 +355,7 @@ async def entrenar_modelo(id: int):
     joblib.dump({col: sorted(X[col].unique().tolist()) for col in categorical_columns}, f'models/model{id}/categorical_values.joblib')
 
     # Imputar valores faltantes
-    X[categorical_columns] = X[categorical_columns].applymap(lambda x: unidecode(str(x).lower()) if isinstance(x, str) else x)
+    X[categorical_columns] = X[categorical_columns].applymap(lambda x: unidecode(str(x).lower()) if isinstance(x, str) else str(x))
     X[numerical_columns] = X[numerical_columns].fillna(X[numerical_columns].median())
     X[categorical_columns] = X[categorical_columns].fillna("Desconocido")
 
@@ -368,7 +368,7 @@ async def entrenar_modelo(id: int):
                 if col in numerical_columns:
                     _, p = stats.pearsonr(X[col], y)
                 else:
-                    _, p = stats.f_oneway(*[X.loc[X[col] == val, y.name] for val in X[col].unique()])
+                    _, p = stats.f_oneway(*[y[X[col] == val] for val in X[col].unique()])
                 p_values.append(p)
             if max(p_values) <= 0.05:
                 break
@@ -386,7 +386,7 @@ async def entrenar_modelo(id: int):
     joblib.dump(numerical_columns, f'models/model{id}/numerical_columns.joblib')
     joblib.dump(categorical_columns, f'models/model{id}/categorical_columns.joblib')
 
-    encoder = preprocessing.OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore', max_categories=10)
+    encoder = preprocessing.OneHotEncoder(sparse_output=False, handle_unknown='ignore', max_categories=10)
     encoded_data = encoder.fit_transform(X[categorical_columns])
     encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out(categorical_columns))
 
